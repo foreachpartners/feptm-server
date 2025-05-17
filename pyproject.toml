@@ -1,0 +1,111 @@
+[project]
+name = "feptm"
+version = "0.1.0"
+description = "Backend service for time and materials accounting with Google Sheets"
+authors = [
+    {name = "Developer", email = "developer@example.com"},
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+
+dependencies = [
+    "fastapi>=0.110.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.2.0",
+    "uvicorn>=0.29.0",
+    "google-api-python-client>=2.0.0",
+    "google-auth>=2.0.0",
+    "google-auth-oauthlib>=0.4.0",
+    "email-validator>=2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "pytest-cov>=4.0.0",
+    "flake8>=7.0.0",
+    "flake8-pyproject>=1.2.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[project.scripts]
+run-api = "bin.run_api:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+include = "src/"
+extend-exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+)/
+| \.json$
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+src_paths = ["src"]
+skip = ["__pycache__"]
+skip_glob = ["*.json"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+files = "src/"
+exclude = ["__pycache__"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = "E203,W293,W291,F541,E501,W292,F401,E261"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".venv",
+    "*.pyc",
+    "build",
+    "dist"
+]
+per-file-ignores = [
+    "__init__.py:F401"
+]
+count = true
+statistics = true
+show-source = true
+filename = "src/*.py"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.3.5",
+]

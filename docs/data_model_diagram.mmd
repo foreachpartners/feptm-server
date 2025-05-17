@@ -1,0 +1,181 @@
+# Диаграмма моделей данных
+
+В этом документе представлена диаграмма моделей данных проекта FEP Time Management.
+
+## Основная диаграмма связей
+
+```mermaid
+classDiagram
+    class Specialist {
+        +str id
+        +str full_name
+        +EmailStr email
+        +SpecialistRole role
+        +float hourly_rate
+        +bool active
+        +datetime hire_date
+        +datetime leave_date
+    }
+    
+    class SpecialistRole {
+        <<enumeration>>
+        +DEVELOPER
+        +QA
+        +DESIGNER
+        +PROJECT_MANAGER
+        +DEVOPS
+        +from_config()
+    }
+    
+    class Project {
+        +str id
+        +str name
+        +str description
+        +str client_name
+        +str client_contact_email
+        +str client_contact_phone
+        +ProjectStatus status
+        +ProjectType project_type
+        +str timesheet_id
+        +datetime start_date
+        +datetime end_date
+        +float budget
+        +HttpUrl repository_url
+        +datetime created_at
+        +datetime updated_at
+        +List[str] specialist_ids
+    }
+    
+    class ProjectStatus {
+        <<enumeration>>
+        +PLANNING
+        +ACTIVE
+        +ON_HOLD
+        +COMPLETED
+        +CANCELLED
+    }
+    
+    class ProjectType {
+        <<enumeration>>
+        +FIXED_PRICE
+        +TIME_AND_MATERIALS
+        +RETAINER
+    }
+    
+    class ProjectMeta {
+        +str name
+        +str description
+        +str client_name
+        +str client_contact_email
+        +str client_contact_phone
+        +ProjectType project_type
+        +datetime start_date
+        +datetime end_date
+        +float budget
+        +str contract_number
+        +str drive_folder_id
+    }
+    
+    class ProjectMetaResponse {
+        +str project_id
+        +str spreadsheet_id
+        +str spreadsheet_url
+        +str drive_folder_id
+        +str drive_folder_url
+        +str project_info_spreadsheet_id
+        +str project_info_spreadsheet_url
+        +str report_spreadsheet_id
+        +str report_spreadsheet_url
+        +str calculations_spreadsheet_id
+        +str calculations_spreadsheet_url
+    }
+    
+    class PaymentPeriod {
+        +str id
+        +str name
+        +datetime start_date
+        +datetime end_date
+        +PaymentStatus status
+        +str report_id
+        +List[TimeEntry] time_entries
+        +Dict[str, float] specialist_totals
+        +Dict[str, float] project_totals
+        +float total_hours
+        +datetime created_at
+        +datetime updated_at
+        +add_time_entry(TimeEntry)
+        -_update_totals(TimeEntry)
+    }
+    
+    class PaymentStatus {
+        <<enumeration>>
+        +DRAFT
+        +SUBMITTED
+        +APPROVED
+        +PAID
+        +REJECTED
+    }
+    
+    class PeriodStatus {
+        <<enumeration>>
+        +OPEN
+        +CLOSED
+        +LOCKED
+    }
+    
+    class TimeEntry {
+        +str id
+        +str specialist_id
+        +str project_id
+        +datetime date
+        +float hours
+        +str description
+        +datetime created_at
+        +datetime updated_at
+    }
+    
+    Specialist "1" <-- "many" TimeEntry : specialist_id
+    Project "1" <-- "many" TimeEntry : project_id
+    Project "many" -- "many" Specialist : specialist_ids
+    PaymentPeriod "1" *-- "many" TimeEntry : contains
+    Specialist --> SpecialistRole : has
+    Project --> ProjectStatus : has
+    Project --> ProjectType : has
+    ProjectMeta --> ProjectType : has
+    PaymentPeriod --> PaymentStatus : has
+    
+    ProjectMeta ..> Project : creates
+    ProjectMeta ..> ProjectMetaResponse : results in
+```
+
+## Описание взаимосвязей
+
+1. **Специалист (Specialist)** - базовая модель для сотрудников
+   - Имеет определенную роль из перечисления SpecialistRole
+   - Связан с Project через поле specialist_ids в Project (многие-ко-многим)
+   - Связан с TimeEntry через specialist_id в TimeEntry (один-ко-многим)
+
+2. **Проект (Project)** - представляет клиентский проект
+   - Имеет статус из перечисления ProjectStatus
+   - Имеет тип из перечисления ProjectType  
+   - Содержит список specialist_ids, ссылающихся на Specialist (многие-ко-многим)
+   - Связан с TimeEntry через project_id в TimeEntry (один-ко-многим)
+   - Имеет связь с ProjectMeta, который используется для создания метаданных в Google Sheets
+
+3. **Платежный период (PaymentPeriod)** - представляет период времени для отслеживания работы 
+   - Содержит список TimeEntry (композиция)
+   - Имеет статус из перечисления PaymentStatus
+   - Отслеживает итоги по специалистам (specialist_totals)
+   - Отслеживает итоги по проектам (project_totals)
+
+4. **Запись времени (TimeEntry)** - запись отработанного времени
+   - Связан со Specialist через specialist_id (многие-к-одному)
+   - Связан с Project через project_id (многие-к-одному)
+   - Содержится в PaymentPeriod в виде списка (композиция)
+
+5. **ProjectMeta** - модель для создания метаданных проекта в Google Sheets
+   - Используется для создания Project
+   - Результатом создания ProjectMeta является ProjectMetaResponse
+
+6. **ProjectMetaResponse** - ответ на создание метаданных проекта
+   - Содержит идентификаторы и URL различных ресурсов в Google Drive/Sheets 

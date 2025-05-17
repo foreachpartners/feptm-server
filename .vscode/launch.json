@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "FastAPI Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "bin.run_api",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/backend",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend:${workspaceFolder}/backend/src"
+            }
+        }
+    ]
+} 

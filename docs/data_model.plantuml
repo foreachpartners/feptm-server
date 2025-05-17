@@ -1,0 +1,148 @@
+@startuml
+
+skinparam classAttributeIconSize 0
+skinparam Monochrome true
+skinparam linetype ortho
+
+package "Models" {
+  ' Enums
+  enum SpecialistRole {
+    DEVELOPER
+    QA
+    DESIGNER
+    PROJECT_MANAGER
+    DEVOPS
+    +from_config()
+  }
+  
+  enum ProjectStatus {
+    PLANNING
+    ACTIVE
+    ON_HOLD
+    COMPLETED
+    CANCELLED
+  }
+  
+  enum ProjectType {
+    FIXED_PRICE
+    TIME_AND_MATERIALS
+    RETAINER
+  }
+  
+  enum PaymentStatus {
+    DRAFT
+    SUBMITTED
+    APPROVED
+    PAID
+    REJECTED
+  }
+  
+  enum PeriodStatus {
+    OPEN
+    CLOSED
+    LOCKED
+  }
+
+  ' Classes
+  class Specialist {
+    +id: str
+    +full_name: str
+    +email: EmailStr
+    +role: SpecialistRole
+    +hourly_rate: float
+    +active: bool
+    +hire_date: datetime
+    +leave_date: datetime
+  }
+  
+  class Project {
+    +id: str
+    +name: str
+    +description: str
+    +client_name: str
+    +client_contact_email: str
+    +client_contact_phone: str
+    +status: ProjectStatus
+    +project_type: ProjectType
+    +timesheet_id: str
+    +start_date: datetime
+    +end_date: datetime
+    +budget: float
+    +repository_url: HttpUrl
+    +created_at: datetime
+    +updated_at: datetime
+    +specialist_ids: List[str]
+  }
+  
+  class ProjectMeta {
+    +name: str
+    +description: str
+    +client_name: str
+    +client_contact_email: str
+    +client_contact_phone: str
+    +project_type: ProjectType
+    +start_date: datetime
+    +end_date: datetime
+    +budget: float
+    +contract_number: str
+    +drive_folder_id: str
+  }
+  
+  class ProjectMetaResponse {
+    +project_id: str
+    +spreadsheet_id: str
+    +spreadsheet_url: str
+    +drive_folder_id: str
+    +drive_folder_url: str
+    +project_info_spreadsheet_id: str
+    +project_info_spreadsheet_url: str
+    +report_spreadsheet_id: str
+    +report_spreadsheet_url: str
+    +calculations_spreadsheet_id: str
+    +calculations_spreadsheet_url: str
+  }
+  
+  class PaymentPeriod {
+    +id: str
+    +name: str
+    +start_date: datetime
+    +end_date: datetime
+    +status: PaymentStatus
+    +report_id: str
+    +time_entries: List[TimeEntry]
+    +specialist_totals: Dict[str, float]
+    +project_totals: Dict[str, float]
+    +total_hours: float
+    +created_at: datetime
+    +updated_at: datetime
+    +add_time_entry(time_entry: TimeEntry): void
+    -_update_totals(time_entry: TimeEntry): void
+  }
+  
+  class TimeEntry {
+    +id: str
+    +specialist_id: str
+    +project_id: str
+    +date: datetime
+    +hours: float
+    +description: str
+    +created_at: datetime
+    +updated_at: datetime
+  }
+}
+
+' Relationships
+Specialist "1" -- "0..*" TimeEntry: < has entries
+TimeEntry "*" -- "1" Project: belongs to >
+Project "*" -- "*" Specialist: employs >
+PaymentPeriod "1" o-- "*" TimeEntry: contains >
+Specialist --> SpecialistRole: has role
+Project --> ProjectStatus: has status
+Project --> ProjectType: has type
+ProjectMeta --> ProjectType: has type
+PaymentPeriod --> PaymentStatus: has status
+
+ProjectMeta ..> Project: creates
+ProjectMeta ..> ProjectMetaResponse: results in
+
+@enduml 
