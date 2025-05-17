@@ -44,7 +44,7 @@ class GoogleSheetsService:
             FileNotFoundError: If no credentials file can be found
         """
         default_locations = [
-            "backend/credentials.json",
+            "credentials.json",
         ]
 
         # Check default locations

@@ -1,9 +1,11 @@
 {
-    "python.analysis.extraPaths": ["backend", "backend/src"],
-    "python.testing.pytestArgs": [
-        "backend/tests"
+    "python.analysis.extraPaths": [
+        "src"
     ],
-    "python.defaultInterpreterPath": "backend/.venv/bin/python",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.defaultInterpreterPath": ".venv/bin/python",
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": false
-} 
+}
