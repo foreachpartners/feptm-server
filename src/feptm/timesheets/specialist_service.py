@@ -26,7 +26,10 @@ class SpecialistService:
         self.google_sheets_service = google_sheets_service
 
     def sync_specialists(
-        self, spreadsheet_id: str, context: TimesheetContext, sheet_name: str = SheetName.TEAM.value
+        self,
+        spreadsheet_id: str,
+        context: TimesheetContext,
+        sheet_name: str = SheetName.TEAM.value,
     ) -> Tuple[List[Specialist], int]:
         """Synchronize specialists for a project.
 
@@ -40,7 +43,9 @@ class SpecialistService:
         """
         try:
             # Get existing specialists
-            specialists, existing_count = self.get_specialists_from_sheet(spreadsheet_id, sheet_name)
+            specialists, existing_count = self.get_specialists_from_sheet(
+                spreadsheet_id, sheet_name
+            )
             if not specialists:
                 log.info("No specialists found in sheet")
                 return [], 0
@@ -51,9 +56,15 @@ class SpecialistService:
 
             # Update specialists sheet with new timesheet IDs
             if new_count > 0:
-                self.update_specialists_sheet(spreadsheet_id, sheet_name, new_specialists)
+                self.update_specialists_sheet(
+                    spreadsheet_id, sheet_name, new_specialists
+                )
 
-            log.info("Synchronized %d specialists, created %d new timesheets", len(specialists), new_count)
+            log.info(
+                "Synchronized %d specialists, created %d new timesheets",
+                len(specialists),
+                new_count,
+            )
             return specialists, new_count
 
         except Exception as e:
@@ -76,17 +87,25 @@ class SpecialistService:
             Exception: If sheet cannot be read or data is invalid
         """
         try:
-            values, headers = self._extract_and_validate_sheet_data(spreadsheet_id, sheet_name)
+            values, headers = self._extract_and_validate_sheet_data(
+                spreadsheet_id, sheet_name
+            )
             specialists, existing_count = self._parse_specialists_data(values, headers)
-            
-            log.info("Extracted %d specialists from sheet '%s'", len(specialists), sheet_name)
+
+            log.info(
+                "Extracted %d specialists from sheet '%s'", len(specialists), sheet_name
+            )
             return specialists, existing_count
 
         except Exception as e:
-            log.error("Failed to extract specialists from sheet '%s': %s", sheet_name, str(e))
+            log.error(
+                "Failed to extract specialists from sheet '%s': %s", sheet_name, str(e)
+            )
             raise Exception(f"Failed to extract specialists data: {str(e)}")
 
-    def create_timesheet(self, specialist: Specialist, context: TimesheetContext) -> Dict[str, str]:
+    def create_timesheet(
+        self, specialist: Specialist, context: TimesheetContext
+    ) -> Dict[str, str]:
         """Create a timesheet for a specialist.
 
         Args:
@@ -104,7 +123,9 @@ class SpecialistService:
 
         try:
             # Generate timesheet title using utility
-            timesheet_title = utils.generate_timesheet_title(specialist.name, context.project_name)
+            timesheet_title = utils.generate_timesheet_title(
+                specialist.name, context.project_name
+            )
 
             # Create the timesheet from template
             result = self.google_sheets_service.ensure_spreadsheet_from_template(
@@ -140,13 +161,18 @@ class SpecialistService:
             Exception: If update fails
         """
         try:
-            sheet_data = self._prepare_timesheet_updates(spreadsheet_id, sheet_name, specialists)
+            sheet_data = self._prepare_timesheet_updates(
+                spreadsheet_id, sheet_name, specialists
+            )
             if not sheet_data:
                 log.info("No timesheet updates needed")
                 return True
 
             self._apply_timesheet_updates(spreadsheet_id, sheet_name, sheet_data)
-            log.info("Successfully updated specialists sheet with %d timesheet IDs", len(sheet_data))
+            log.info(
+                "Successfully updated specialists sheet with %d timesheet IDs",
+                len(sheet_data),
+            )
             return True
 
         except Exception as e:
@@ -169,12 +195,14 @@ class SpecialistService:
             Exception: If sheet cannot be read or is invalid
         """
         # Check if sheet exists
-            sheet = self.google_sheets_service.get_sheet_by_name(
-                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
-            )
+        sheet = self.google_sheets_service.get_sheet_by_name(
+            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
+        )
 
-            if not sheet:
-            log.warning("Sheet '%s' not found in spreadsheet %s", sheet_name, spreadsheet_id)
+        if not sheet:
+            log.warning(
+                "Sheet '%s' not found in spreadsheet %s", sheet_name, spreadsheet_id
+            )
             return [], []
 
         # Get sheet data using utility method
@@ -198,8 +226,12 @@ class SpecialistService:
         Raises:
             Exception: If required columns are missing
         """
-        name_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.NAME.value])
-        role_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.ROLE.value])
+        name_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.NAME.value]
+        )
+        role_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.ROLE.value]
+        )
 
         if name_idx is None or role_idx is None:
             missing = []
@@ -208,7 +240,9 @@ class SpecialistService:
             if role_idx is None:
                 missing.append(ColumnName.ROLE.value)
 
-            raise Exception(f"Required columns missing in specialists sheet: {', '.join(missing)}")
+            raise Exception(
+                f"Required columns missing in specialists sheet: {', '.join(missing)}"
+            )
 
     def _parse_specialists_data(
         self, values: List[List], headers: List[str]
@@ -224,7 +258,7 @@ class SpecialistService:
         """
         # Map column indices using utility
         headers_map = self._build_headers_map(headers)
-        
+
         specialists = []
         existing_count = 0
 
@@ -251,13 +285,27 @@ class SpecialistService:
             Dictionary mapping column names to indices
         """
         return {
-            "name": self.google_sheets_service.find_column_index(headers, [ColumnName.NAME.value]),
-            "role": self.google_sheets_service.find_column_index(headers, [ColumnName.ROLE.value]),
-            "project": self.google_sheets_service.find_column_index(headers, [ColumnName.PROJECT.value]),
-            "internal_rate": self.google_sheets_service.find_column_index(headers, [ColumnName.INTERNAL_RATE.value]),
-            "external_rate": self.google_sheets_service.find_column_index(headers, [ColumnName.EXTERNAL_RATE.value]),
-            "date": self.google_sheets_service.find_column_index(headers, [ColumnName.DATE.value]),
-            "timesheet": self.google_sheets_service.find_column_index(headers, [ColumnName.TIMESHEET.value]),
+            "name": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.NAME.value]
+            ),
+            "role": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.ROLE.value]
+            ),
+            "project": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.PROJECT.value]
+            ),
+            "internal_rate": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.INTERNAL_RATE.value]
+            ),
+            "external_rate": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.EXTERNAL_RATE.value]
+            ),
+            "date": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.DATE.value]
+            ),
+            "timesheet": self.google_sheets_service.find_column_index(
+                headers, [ColumnName.TIMESHEET.value]
+            ),
         }
 
     def _parse_specialist_row(
@@ -273,8 +321,12 @@ class SpecialistService:
             Specialist object or None if row is invalid
         """
         # Get required fields
-        name = row[headers_map["name"]].strip() if headers_map["name"] < len(row) else ""
-        role = row[headers_map["role"]].strip() if headers_map["role"] < len(row) else ""
+        name = (
+            row[headers_map["name"]].strip() if headers_map["name"] < len(row) else ""
+        )
+        role = (
+            row[headers_map["role"]].strip() if headers_map["role"] < len(row) else ""
+        )
 
         # Skip rows with empty required fields
         if not name or not role:
@@ -283,8 +335,12 @@ class SpecialistService:
         # Get optional fields using utilities
         project = self._get_optional_field(row, headers_map["project"])
         date = self._parse_date_field(row, headers_map["date"], name)
-        internal_rate = self._parse_decimal_field(row, headers_map["internal_rate"], name, "internal rate")
-        external_rate = self._parse_decimal_field(row, headers_map["external_rate"], name, "external rate")
+        internal_rate = self._parse_decimal_field(
+            row, headers_map["internal_rate"], name, "internal rate"
+        )
+        external_rate = self._parse_decimal_field(
+            row, headers_map["external_rate"], name, "external rate"
+        )
         timesheet = self._get_optional_field(row, headers_map["timesheet"])
 
         return Specialist(
@@ -297,7 +353,9 @@ class SpecialistService:
             timesheet=timesheet,
         )
 
-    def _get_optional_field(self, row: List, column_idx: Optional[int]) -> Optional[str]:
+    def _get_optional_field(
+        self, row: List, column_idx: Optional[int]
+    ) -> Optional[str]:
         """Get optional field value from row.
 
         Args:
@@ -327,14 +385,22 @@ class SpecialistService:
         if column_idx is not None and column_idx < len(row):
             date_str = row[column_idx].strip()
             if date_str:
-                parsed_date = utils.parse_date_safely(date_str, DateFormat.SHEET_DATE.value)
+                parsed_date = utils.parse_date_safely(
+                    date_str, DateFormat.SHEET_DATE.value
+                )
                 if parsed_date is None:
-                    log.warning("Invalid date format for %s: %s", specialist_name, date_str)
+                    log.warning(
+                        "Invalid date format for %s: %s", specialist_name, date_str
+                    )
                 return parsed_date
         return None
 
     def _parse_decimal_field(
-        self, row: List, column_idx: Optional[int], specialist_name: str, field_name: str
+        self,
+        row: List,
+        column_idx: Optional[int],
+        specialist_name: str,
+        field_name: str,
     ) -> Any:
         """Parse decimal field from row.
 
@@ -352,11 +418,18 @@ class SpecialistService:
             if rate_str:
                 result = utils.parse_decimal_safely(rate_str)
                 if result == 0 and rate_str != "0":
-                    log.warning("Invalid %s value for %s: %s", field_name, specialist_name, rate_str)
+                    log.warning(
+                        "Invalid %s value for %s: %s",
+                        field_name,
+                        specialist_name,
+                        rate_str,
+                    )
                 return result
         return utils.parse_decimal_safely("")  # Returns Decimal("0")
 
-    def _create_missing_timesheets(self, specialists: List[Specialist], context: TimesheetContext) -> List[Specialist]:
+    def _create_missing_timesheets(
+        self, specialists: List[Specialist], context: TimesheetContext
+    ) -> List[Specialist]:
         """Create timesheets for specialists who don't have them.
 
         Args:
@@ -374,7 +447,9 @@ class SpecialistService:
                     new_specialists.append(specialist)
                     log.debug("Created timesheet for %s", specialist.name)
                 except Exception as e:
-                    log.error("Failed to create timesheet for %s: %s", specialist.name, str(e))
+                    log.error(
+                        "Failed to create timesheet for %s: %s", specialist.name, str(e)
+                    )
 
         return new_specialists
 
@@ -399,8 +474,12 @@ class SpecialistService:
         if not values:
             return []
 
-        timesheet_col_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.TIMESHEET.value])
-        name_col_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.NAME.value])
+        timesheet_col_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.TIMESHEET.value]
+        )
+        name_col_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.NAME.value]
+        )
 
         if timesheet_col_idx is None or name_col_idx is None:
             log.warning("Required columns not found for timesheet updates")
@@ -408,14 +487,18 @@ class SpecialistService:
 
         # Find specialists that need timesheet ID updates
         updates = []
-            for specialist in specialists:
-                if not specialist.timesheet:
-                    continue
+        for specialist in specialists:
+            if not specialist.timesheet:
+                continue
 
             # Find the row for this specialist using utility
-            row_idx = self.google_sheets_service.find_specialist_row_index(values, name_col_idx, specialist.name)
+            row_idx = self.google_sheets_service.find_specialist_row_index(
+                values, name_col_idx, specialist.name
+            )
             if row_idx is not None:
-                updates.append((row_idx + 1, specialist.timesheet))  # +1 for 1-based indexing
+                updates.append(
+                    (row_idx + 1, specialist.timesheet)
+                )  # +1 for 1-based indexing
 
         return updates
 
@@ -434,20 +517,24 @@ class SpecialistService:
             spreadsheet_id, sheet_name, RangeFormat.SPECIALIST_DATA.value
         )
 
-        timesheet_col_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.TIMESHEET.value])
+        timesheet_col_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.TIMESHEET.value]
+        )
 
         if timesheet_col_idx is None:
             raise Exception("Timesheet column not found")
 
         # Convert column index to letter using utility
-        timesheet_col_letter = self.google_sheets_service.column_index_to_letter(timesheet_col_idx)
+        timesheet_col_letter = self.google_sheets_service.column_index_to_letter(
+            timesheet_col_idx
+        )
 
         # Apply updates
         for row_idx, timesheet_id in updates:
             update_range = f"{sheet_name}!{timesheet_col_letter}{row_idx}"
-            
-                        self.google_sheets_service.update_range(
-                            spreadsheet_id=spreadsheet_id,
+
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
                 range_name=update_range,
                 values=[[timesheet_id]],
                 value_input_option="RAW",
@@ -471,8 +558,6 @@ class SpecialistService:
         import_formula = config_service.get_import_specialist_timesheet_formula(
             specialist_timesheet_id=specialist.timesheet
         )
-        
+
         # Basic specialist information for report
         return [[specialist.name, specialist.role, import_formula]]
-
-

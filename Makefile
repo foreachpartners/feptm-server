@@ -1,7 +1,7 @@
 .PHONY: lint format isort typecheck test all
 
-# Set PYTHONPATH for all commands
-export PYTHONPATH := $(shell pwd):$(shell pwd)/src
+# Set PYTHONPATH for test and runtime commands only
+export PYTHONPATH := $(shell pwd)/src
 
 lint:
 	uv run flake8 src
@@ -13,7 +13,7 @@ isort:
 	uv run python -m isort src
 
 typecheck:
-	uv run mypy src --ignore-missing-imports
+	PYTHONPATH= uv run mypy src
 
 test:
 	uv run pytest $(ARGS)
