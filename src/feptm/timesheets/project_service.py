@@ -16,10 +16,14 @@ from feptm.timesheets.specialist_service import SpecialistService
 
 
 class TimesheetProjectService:
-    """Service for handling project timesheets."""
+    """Service for handling project timesheets and related operations."""
 
-    def __init__(self, google_sheets_service: GoogleSheetsService):
-        """Initialize with Google Sheets service."""
+    def __init__(self, google_sheets_service: GoogleSheetsService) -> None:
+        """Initialize with Google Sheets service.
+
+        Args:
+            google_sheets_service: Google Sheets service instance
+        """
         self.google_sheets_service = google_sheets_service
         self.specialist_service = SpecialistService(google_sheets_service)
 
@@ -247,111 +251,146 @@ class TimesheetProjectService:
         """Synchronize specialists from project info sheet.
 
         This method:
-        1. Loads project info by ID
+        1. Validates project exists and extracts metadata
         2. Extracts specialists info from the project info sheet
         3. Creates timesheets for specialists who don't have them
         4. Updates the specialists info sheet with timesheet IDs
         5. Links specialist timesheets to report and calculation sheets
 
         Args:
-            project_id: The ID of the project info spreadsheet
+            project_id: ID of the project info spreadsheet
 
         Returns:
-            Tuple containing:
-            - List of all specialists
-            - Total number of specialists found
-            - Number of new timesheets created
+            Tuple containing (specialists, total_count, new_timesheets_created)
 
         Raises:
             Exception: If synchronization fails
         """
         try:
-            # 1. Validate the project spreadsheet exists
-            try:
-                project_info = self.google_sheets_service.get_file(project_id)
-                log.info(f"Project info found: {project_info.get('name')}")
-            except Exception as e:
-                raise Exception(f"Project with ID {project_id} not found: {str(e)}")
-
-            # 2. Get project metadata from the sheet
-            project = self._extract_project_metadata(project_id)
-
-            # 3. Get specialists from the project info sheet
-            specialists, existing_timesheets = (
-                self.specialist_service.get_specialists_from_sheet(
-                    spreadsheet_id=project_id, sheet_name=SheetName.TEAM.value
-                )
-            )
-
+            # Validate project and get metadata
+            project = self._validate_and_extract_project(project_id)
+            
+            # Get specialists from project sheet
+            specialists, existing_count = self._get_project_specialists(project_id)
             if not specialists:
-                log.info("No specialists found in the project info sheet")
+                log.info("No specialists found in project sheet")
                 return [], 0, 0
 
-            log.info(
-                f"Found {len(specialists)} specialists, {existing_timesheets} with existing timesheets"
-            )
+            # Create timesheets for specialists without them
+            new_specialists = self._create_missing_timesheets(project, specialists)
+            new_count = len(new_specialists)
 
-            # 4. Create timesheets for specialists without them
-            specialists_with_new_timesheets = self._create_specialist_timesheets(
-                project=project,
-                specialists=specialists
-            )
+            # Update project sheet with new timesheet IDs
+            if new_count > 0:
+                self._update_project_with_timesheets(project_id, new_specialists)
 
-            new_timesheets_created = len(specialists_with_new_timesheets)
+            # Link timesheets to reports and calculations
+            if new_specialists:
+                self._link_timesheets_to_reports(project, new_specialists)
 
-            # 5. Update project info sheet with timesheet IDs
-            if new_timesheets_created > 0:
-                self.specialist_service.update_specialists_sheet(
-                    spreadsheet_id=project_id,
-                    sheet_name=SheetName.TEAM.value,
-                    specialists=specialists_with_new_timesheets,
-                )
-
-            # 6. Link timesheets to report and calculations sheets
-            if specialists_with_new_timesheets:
-                self._link_specialist_timesheets(
-                    project=project, specialists=specialists_with_new_timesheets
-                )
-
-            return specialists, len(specialists), new_timesheets_created
+            log.info("Synchronized %d specialists, created %d new timesheets", len(specialists), new_count)
+            return specialists, len(specialists), new_count
 
         except Exception as e:
-            log.error(f"Error syncing project specialists: {str(e)}")
+            log.error("Failed to sync project specialists: %s", str(e))
             raise Exception(f"Failed to sync project specialists: {str(e)}")
 
-    def _create_specialist_timesheets(self, project: Project, specialists: List[Specialist]) -> List[Specialist]:
-        """Helper method to create timesheets for specialists without them.
-        
+    def _validate_and_extract_project(self, project_id: str) -> Project:
+        """Validate project exists and extract its metadata.
+
         Args:
-            project: Project object with folder_id
-            specialists: List of specialists to check and create timesheets for
-            
+            project_id: ID of the project info spreadsheet
+
         Returns:
-            List of specialists for which timesheets were created
-            
+            Project object with metadata
+
         Raises:
-            Exception: If folder_id is None or timesheet creation fails
+            Exception: If project validation or metadata extraction fails
         """
-        specialists_with_new_timesheets = []
+        try:
+            project_info = self.google_sheets_service.get_file(project_id)
+            log.debug("Project found: %s", project_info.get('name'))
+        except Exception as e:
+            raise Exception(f"Project with ID {project_id} not found: {str(e)}")
+
+        return self._extract_project_metadata(project_id)
+
+    def _get_project_specialists(self, project_id: str) -> Tuple[List[Specialist], int]:
+        """Get specialists from project info sheet.
+
+        Args:
+            project_id: ID of the project info spreadsheet
+
+        Returns:
+            Tuple of (specialists_list, existing_timesheets_count)
+        """
+        specialists, existing_count = self.specialist_service.get_specialists_from_sheet(
+            spreadsheet_id=project_id, sheet_name=SheetName.TEAM.value
+        )
         
+        log.info("Found %d specialists, %d with existing timesheets", len(specialists), existing_count)
+        return specialists, existing_count
+
+    def _create_missing_timesheets(self, project: Project, specialists: List[Specialist]) -> List[Specialist]:
+        """Create timesheets for specialists who don't have them.
+
+        Args:
+            project: Project object with metadata
+            specialists: List of all specialists
+
+        Returns:
+            List of specialists for whom new timesheets were created
+
+        Raises:
+            Exception: If project folder ID is missing
+        """
+        if not project.drive_folder_id:
+            log.warning("Project drive folder ID is missing, cannot create timesheets")
+            return []
+
+        new_specialists = []
         for specialist in specialists:
             if not specialist.timesheet:
-                # Make sure folder_id is not None
-                if not project.drive_folder_id:
-                    log.warning(
-                        "Project drive folder ID is None, can't create timesheets"
-                    )
-                    break
+                try:
+                    # Make sure folder_id is not None
+                    if not project.drive_folder_id:
+                        log.warning("Project drive folder ID is missing, cannot create timesheets")
+                        break
 
-                # Create timesheet
-                result = self.specialist_service.create_specialist_timesheet(
-                    specialist=specialist,
-                    project_name=project.name,
-                    folder_id=project.drive_folder_id,
-                )
-                specialists_with_new_timesheets.append(specialist)
-                
-        return specialists_with_new_timesheets
+                    # Create timesheet
+                    result = self.specialist_service.create_specialist_timesheet(
+                        specialist=specialist,
+                        project_name=project.name,
+                        folder_id=project.drive_folder_id,
+                    )
+                    new_specialists.append(specialist)
+                    log.debug("Created timesheet for %s", specialist.name)
+                except Exception as e:
+                    log.error("Failed to create timesheet for %s: %s", specialist.name, str(e))
+
+        return new_specialists
+
+    def _update_project_with_timesheets(self, project_id: str, specialists: List[Specialist]) -> None:
+        """Update project sheet with new timesheet IDs.
+
+        Args:
+            project_id: ID of the project info spreadsheet
+            specialists: List of specialists with new timesheets
+        """
+        self.specialist_service.update_specialists_sheet(
+            spreadsheet_id=project_id,
+            sheet_name=SheetName.TEAM.value,
+            specialists=specialists
+        )
+
+    def _link_timesheets_to_reports(self, project: Project, specialists: List[Specialist]) -> None:
+        """Link specialist timesheets to report and calculation sheets.
+
+        Args:
+            project: Project object with metadata
+            specialists: List of specialists with timesheets to link
+        """
+        self._link_specialist_timesheets(project=project, specialists=specialists)
 
     def _extract_project_metadata(self, project_id: str) -> Project:
         """Extract project metadata from project info sheet.
@@ -446,7 +485,7 @@ class TimesheetProjectService:
             return project
 
         except Exception as e:
-            log.error(f"Error extracting project metadata: {str(e)}")
+            log.error("Error extracting project metadata: %s", str(e))
             raise Exception(f"Failed to extract project metadata: {str(e)}")
 
     def _link_specialist_timesheets(
@@ -509,13 +548,13 @@ class TimesheetProjectService:
                 )
 
         except Exception as e:
-            log.error(f"Error linking specialist timesheets: {str(e)}")
+            log.error("Error linking specialist timesheets: %s", str(e))
             raise Exception(f"Failed to link specialist timesheets: {str(e)}")
 
     def _update_general_expenses_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
     ) -> None:
-        """Update the Current Period tab in General Expenses spreadsheet with the specialist.
+        """Update Current Period tab in General Expenses spreadsheet with specialist.
 
         Args:
             spreadsheet_id: ID of the General Expenses spreadsheet
@@ -525,170 +564,269 @@ class TimesheetProjectService:
             Exception: If update fails
         """
         try:
-            # Check if sheets service is initialized
-            if not self.google_sheets_service.sheets_service:
-                raise Exception("Google Sheets service not initialized")
-
-            # Find the sheet with the exact name from Google Sheet
             sheet_name = SheetName.CURRENT_PERIOD.value
-            sheet = self.google_sheets_service.get_sheet_by_name(
-                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
-            )
-
-            if not sheet:
-                log.warning(f"{sheet_name} tab not found in {spreadsheet_id}")
+            sheet_data = self._get_current_period_sheet_data(spreadsheet_id, sheet_name)
+            
+            if not sheet_data:
                 return
 
-            # Get the current data
-            range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
-            result = (
-                self.google_sheets_service.sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=range_name)
-                .execute()
-            )
-
-            values = result.get("values", [])
-            if not values:
-                log.warning(f"No data found in {sheet_name} tab")
+            values, headers, sheet = sheet_data
+            
+            # Check if specialist already exists
+            if self._specialist_exists_in_current_period(values, headers, specialist.name):
+                log.info("Specialist %s already exists in Current Period", specialist.name)
                 return
 
-            # Get table headers
-            headers = values[0]
+            # Find insert position and prepare data
+            insert_row = self._find_insert_position_for_specialist(values, headers)
+            update_data = self._prepare_general_expenses_row_data(headers, specialist)
             
-            # Find indices of required columns
-            specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
-            role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
-            hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
-            
-            log.info(f"Headers: {headers}")
-            log.info(f"Hours Worked column index: {hours_worked_idx}")
-            
-            if specialist_idx is None or role_idx is None:
-                log.warning("Required columns not found in Current period tab")
-                return
-
-            # Find the last row before the total sum and check if specialist exists
-            last_data_row = None
-            total_row = None
-            specialist_exists = False
-            has_any_specialists = False
-            
-            for i, row in enumerate(values):
-                # Check if this specialist already exists
-                if i > 0 and len(row) > specialist_idx and row[specialist_idx] == specialist.name:
-                    log.info(f"Specialist {specialist.name} already exists in row {i+1}")
-                    specialist_exists = True
-                    return  # Specialist already exists, do nothing
-                
-                # Check if there are any specialists
-                if i > 0 and len(row) > specialist_idx and row[specialist_idx]:
-                    has_any_specialists = True
-                    last_data_row = i
-                
-                # If we find a total row (usually contains sums or "Total")
-                if i > 0 and len(row) > specialist_idx:
-                    # Check if this is a total row (usually has numeric values without specialist name)
-                    if (not row[specialist_idx] or row[specialist_idx] == "0" or 
-                        (len(row) > 2 and "$" in str(row[2]) and not row[0])):
-                        total_row = i
-                        break
-            
-            # If this is the first specialist in the document, use row 2
-            if not has_any_specialists and len(values) > 1:
-                insert_row = 1  # Row 2 in 0-based indexing is 1
-                # No need to insert a new row, use existing
-                need_to_insert_row = False
-            else:
-                # Determine where to insert the new specialist (if there are already specialists)
-                if last_data_row is not None:
-                    # Insert after last data row
-                    insert_row = last_data_row + 1
-                else:
-                    # If no data, insert after header
-                    insert_row = 1
-                
-                # If there is a total row, insert before it
-                if total_row is not None and (insert_row is None or insert_row >= total_row):
-                    insert_row = total_row
-                
-                need_to_insert_row = True
-            
-            # Get sheet ID for operations
-            sheet_id = sheet.get("properties", {}).get("sheetId")
-            
-            # 1. Insert new row before total (if needed)
-            if need_to_insert_row and total_row is not None:
-                # Create insert row request
-                request = {
-                    "insertDimension": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": insert_row,
-                            "endIndex": insert_row + 1
-                        },
-                        "inheritFromBefore": True
-                    }
-                }
-                
-                # Execute request
-                self.google_sheets_service.batch_update(
-                    spreadsheet_id=spreadsheet_id,
-                    requests=[request]
-                )
-            
-            # 2. Fill cells with specialist data
-            update_data = [""] * len(headers)
-            update_data[specialist_idx] = specialist.name
-            update_data[role_idx] = specialist.role
-            
-            # Add working hours formula if column exists
-            if hours_worked_idx is not None:
-                try:
-                    # Get calculation formula from config
-                    working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
-                    # Use formula directly without modifications
-                    update_data[hours_worked_idx] = working_hours_formula
-                    log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
-                except Exception as e:
-                    log.warning(f"Failed to set hours calculation formula: {str(e)}")
-            
-            # For General Expenses document
-            rate_idx = self._find_column_index(headers, ColumnName.HOURLY_RATE_USD.value)
-            total_cost_idx = self._find_column_index(headers, ColumnName.TOTAL_COST_USD.value)
-            
-            if rate_idx is not None:
-                update_data[rate_idx] = str(specialist.external_rate)
-                
-            # Add Gross total cost formula if total cost column exists
-            if total_cost_idx is not None:
-                try:
-                    gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
-                    update_data[total_cost_idx] = gross_total_cost_formula
-                    log.info(f"Set total cost formula for {specialist.name}: {gross_total_cost_formula}")
-                except Exception as e:
-                    log.warning(f"Failed to set total cost formula: {str(e)}")
-            
-            # Update data
-            target_row = insert_row + 1  # 1-based indexing for range
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}",
-                values=[update_data],
-                value_input_option="USER_ENTERED",
+            # Insert row if needed and update data
+            self._insert_and_update_specialist_row(
+                spreadsheet_id, sheet_name, sheet, insert_row, update_data, headers
             )
             
-            log.info(f"Added {specialist.name} to {sheet_name} tab in row {target_row}")
+            log.info("Added %s to %s tab", specialist.name, sheet_name)
 
         except Exception as e:
-            log.error(f"Error updating General Expenses Current Period tab: {str(e)}")
+            log.error("Failed to update General Expenses Current Period tab: %s", str(e))
             raise Exception(f"Failed to update General Expenses Current Period tab: {str(e)}")
+
+    def _get_current_period_sheet_data(
+        self, spreadsheet_id: str, sheet_name: str
+    ) -> Optional[Tuple[List[List], List[str], Dict]]:
+        """Get sheet data for Current Period operations.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+
+        Returns:
+            Tuple of (values, headers, sheet) or None if not found
+        """
+        if not self.google_sheets_service.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+
+        sheet = self.google_sheets_service.get_sheet_by_name(
+            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
+        )
+
+        if not sheet:
+            log.warning("Sheet '%s' not found in spreadsheet %s", sheet_name, spreadsheet_id)
+            return None
+
+        # Get current data
+        range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
+        result = (
+            self.google_sheets_service.sheets_service.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=range_name)
+            .execute()
+        )
+
+        values = result.get("values", [])
+        if not values:
+            log.warning("No data found in sheet '%s'", sheet_name)
+            return None
+
+        headers = values[0]
+        return values, headers, sheet
+
+    def _specialist_exists_in_current_period(
+        self, values: List[List], headers: List[str], specialist_name: str
+    ) -> bool:
+        """Check if specialist already exists in Current Period sheet.
+
+        Args:
+            values: Sheet values
+            headers: Header row
+            specialist_name: Name of the specialist to check
+
+        Returns:
+            True if specialist exists
+        """
+        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        if specialist_idx is None:
+            return False
+
+        for i, row in enumerate(values[1:], start=1):  # Skip header
+            if len(row) > specialist_idx and row[specialist_idx] == specialist_name:
+                return True
+
+        return False
+
+    def _find_insert_position_for_specialist(self, values: List[List], headers: List[str]) -> int:
+        """Find the position where to insert a new specialist.
+
+        Args:
+            values: Sheet values
+            headers: Header row
+
+        Returns:
+            Row index for insertion (0-based)
+        """
+        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        if specialist_idx is None:
+            return 1  # Insert after header
+
+        last_data_row = None
+        total_row = None
+        has_specialists = False
+
+        for i, row in enumerate(values[1:], start=1):  # Skip header
+            if len(row) > specialist_idx and row[specialist_idx]:
+                has_specialists = True
+                last_data_row = i
+
+            # Check for total row (usually has formula or specific pattern)
+            if i > 0 and len(row) > specialist_idx:
+                if (not row[specialist_idx] or row[specialist_idx] == "0" or 
+                    (len(row) > 2 and "$" in str(row[2]) and not row[0])):
+                    total_row = i
+                    break
+
+        # Determine insert position
+        if not has_specialists:
+            return 1  # First specialist, use row 2
+
+        if last_data_row is not None:
+            insert_row = last_data_row + 1
+        else:
+            insert_row = 1
+
+        # Insert before total row if it exists
+        if total_row is not None and insert_row >= total_row:
+            insert_row = total_row
+
+        return insert_row
+
+    def _prepare_general_expenses_row_data(self, headers: List[str], specialist: Specialist) -> List[str]:
+        """Prepare row data for General Expenses sheet.
+
+        Args:
+            headers: Column headers
+            specialist: Specialist object
+
+        Returns:
+            List of values for the row
+        """
+        update_data = [""] * len(headers)
+        
+        # Basic specialist information
+        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+        
+        if specialist_idx is not None:
+            update_data[specialist_idx] = specialist.name
+        if role_idx is not None:
+            update_data[role_idx] = specialist.role
+
+        # Add formulas and rates
+        self._add_working_hours_formula(update_data, headers)
+        self._add_general_expenses_formulas(update_data, headers, specialist)
+
+        return update_data
+
+    def _add_working_hours_formula(self, update_data: List[str], headers: List[str]) -> None:
+        """Add working hours formula to row data.
+
+        Args:
+            update_data: Row data to update
+            headers: Column headers
+        """
+        hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
+        if hours_worked_idx is not None:
+            try:
+                working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
+                update_data[hours_worked_idx] = working_hours_formula
+                log.debug("Added working hours formula")
+            except Exception as e:
+                log.warning("Failed to set hours calculation formula: %s", str(e))
+
+    def _add_general_expenses_formulas(
+        self, update_data: List[str], headers: List[str], specialist: Specialist
+    ) -> None:
+        """Add General Expenses specific formulas and rates.
+
+        Args:
+            update_data: Row data to update
+            headers: Column headers
+            specialist: Specialist object
+        """
+        # Add hourly rate
+        rate_idx = self._find_column_index(headers, ColumnName.HOURLY_RATE_USD.value)
+        if rate_idx is not None:
+            update_data[rate_idx] = str(specialist.external_rate)
+
+        # Add total cost formula
+        total_cost_idx = self._find_column_index(headers, ColumnName.TOTAL_COST_USD.value)
+        if total_cost_idx is not None:
+            try:
+                gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
+                update_data[total_cost_idx] = gross_total_cost_formula
+                log.debug("Added total cost formula")
+            except Exception as e:
+                log.warning("Failed to set total cost formula: %s", str(e))
+
+    def _insert_and_update_specialist_row(
+        self, 
+        spreadsheet_id: str, 
+        sheet_name: str, 
+        sheet: Dict, 
+        insert_row: int, 
+        update_data: List[str], 
+        headers: List[str]
+    ) -> None:
+        """Insert new row if needed and update with specialist data.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+            sheet: Sheet object
+            insert_row: Row index for insertion
+            update_data: Data to insert
+            headers: Column headers
+        """
+        # Insert row if needed (when there are existing specialists and total rows)
+        sheet_id = sheet.get("properties", {}).get("sheetId")
+        
+        # For now, always try to insert a new row for safety
+        # This could be optimized later based on specific conditions
+        try:
+            request = {
+                "insertDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": insert_row,
+                        "endIndex": insert_row + 1
+                    },
+                    "inheritFromBefore": True
+                }
+            }
             
+            self.google_sheets_service.batch_update(
+                spreadsheet_id=spreadsheet_id,
+                requests=[request]
+            )
+        except Exception as e:
+            log.warning("Failed to insert row, continuing with update: %s", str(e))
+
+        # Update the row with data
+        target_row = insert_row + 1  # Convert to 1-based indexing
+        range_name = f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}"
+        
+        self.google_sheets_service.update_range(
+            spreadsheet_id=spreadsheet_id,
+            range_name=range_name,
+            values=[update_data],
+            value_input_option="USER_ENTERED",
+        )
+
     def _update_payment_distribution_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
     ) -> None:
-        """Update the Current Period tab in Payment Distribution spreadsheet with the specialist.
+        """Update Current Period tab in Payment Distribution spreadsheet with specialist.
 
         Args:
             spreadsheet_id: ID of the Payment Distribution spreadsheet
@@ -698,193 +836,113 @@ class TimesheetProjectService:
             Exception: If update fails
         """
         try:
-            # Check if sheets service is initialized
-            if not self.google_sheets_service.sheets_service:
-                raise Exception("Google Sheets service not initialized")
-
-            # Find the sheet with the exact name from Google Sheet
             sheet_name = SheetName.CURRENT_PERIOD.value
-            sheet = self.google_sheets_service.get_sheet_by_name(
-                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
-            )
-
-            if not sheet:
-                log.warning(f"{sheet_name} tab not found in {spreadsheet_id}")
+            sheet_data = self._get_current_period_sheet_data(spreadsheet_id, sheet_name)
+            
+            if not sheet_data:
                 return
 
-            # Get the current data
-            range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
-            result = (
-                self.google_sheets_service.sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=range_name)
-                .execute()
-            )
-
-            values = result.get("values", [])
-            if not values:
-                log.warning(f"No data found in {sheet_name} tab")
+            values, headers, sheet = sheet_data
+            
+            # Check if specialist already exists
+            if self._specialist_exists_in_current_period(values, headers, specialist.name):
+                log.info("Specialist %s already exists in Current Period", specialist.name)
                 return
 
-            # Get table headers
-            headers = values[0]
+            # Find insert position and prepare data
+            insert_row = self._find_insert_position_for_specialist(values, headers)
+            update_data = self._prepare_payment_distribution_row_data(headers, specialist)
             
-            # Find indices of required columns
-            specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
-            role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
-            hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
-            
-            log.info(f"Headers: {headers}")
-            log.info(f"Hours Worked column index: {hours_worked_idx}")
-            
-            if specialist_idx is None or role_idx is None:
-                log.warning("Required columns not found in Current period tab")
-                return
-
-            # Find the last row before the total sum and check if specialist exists
-            last_data_row = None
-            total_row = None
-            specialist_exists = False
-            has_any_specialists = False
-            
-            for i, row in enumerate(values):
-                # Check if this specialist already exists
-                if i > 0 and len(row) > specialist_idx and row[specialist_idx] == specialist.name:
-                    log.info(f"Specialist {specialist.name} already exists in row {i+1}")
-                    specialist_exists = True
-                    return  # Specialist already exists, do nothing
-                
-                # Check if there are any specialists
-                if i > 0 and len(row) > specialist_idx and row[specialist_idx]:
-                    has_any_specialists = True
-                    last_data_row = i
-                
-                # If we find a total row (usually contains sums or "Total")
-                if i > 0 and len(row) > specialist_idx:
-                    # Check if this is a total row (usually has numeric values without specialist name)
-                    if (not row[specialist_idx] or row[specialist_idx] == "0" or 
-                        (len(row) > 2 and "$" in str(row[2]) and not row[0])):
-                        total_row = i
-                        break
-            
-            # If this is the first specialist in the document, use row 2
-            if not has_any_specialists and len(values) > 1:
-                insert_row = 1  # Row 2 in 0-based indexing is 1
-                # No need to insert a new row, use existing
-                need_to_insert_row = False
-            else:
-                # Determine where to insert the new specialist (if there are already specialists)
-                if last_data_row is not None:
-                    # Insert after last data row
-                    insert_row = last_data_row + 1
-                else:
-                    # If no data, insert after header
-                    insert_row = 1
-                
-                # If there is a total row, insert before it
-                if total_row is not None and (insert_row is None or insert_row >= total_row):
-                    insert_row = total_row
-                
-                need_to_insert_row = True
-            
-            # Get sheet ID for operations
-            sheet_id = sheet.get("properties", {}).get("sheetId")
-            
-            # 1. Insert new row before total (if needed)
-            if need_to_insert_row and total_row is not None:
-                # Create insert row request
-                request = {
-                    "insertDimension": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": insert_row,
-                            "endIndex": insert_row + 1
-                        },
-                        "inheritFromBefore": True
-                    }
-                }
-                
-                # Execute request
-                self.google_sheets_service.batch_update(
-                    spreadsheet_id=spreadsheet_id,
-                    requests=[request]
-                )
-            
-            # 2. Fill cells with specialist data
-            update_data = [""] * len(headers)
-            update_data[specialist_idx] = specialist.name
-            update_data[role_idx] = specialist.role
-            
-            # Add working hours formula if column exists
-            if hours_worked_idx is not None:
-                try:
-                    # Get calculation formula from config
-                    working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
-                    # Use formula directly without modifications
-                    update_data[hours_worked_idx] = working_hours_formula
-                    log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
-                except Exception as e:
-                    log.warning(f"Failed to set hours calculation formula: {str(e)}")
-            
-            # For Payment Distribution document
-            client_rate_idx = self._find_column_index(headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
-            specialist_rate_idx = self._find_column_index(headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
-            
-            if client_rate_idx is not None:
-                update_data[client_rate_idx] = str(specialist.external_rate)
-            
-            if specialist_rate_idx is not None:
-                update_data[specialist_rate_idx] = str(specialist.internal_rate)
-            
-            # Add formulas for cost and revenue calculations
-            client_work_cost_idx = self._find_column_index(headers, ColumnName.CLIENT_WORK_COST_USD.value)
-            specialist_work_cost_idx = self._find_column_index(headers, ColumnName.SPECIALIST_WORK_COST_USD.value)
-            revenue_idx = self._find_column_index(headers, ColumnName.REVENUE_USD.value)
-            
-            try:
-                # Get formulas from config using the generic get_formula method
-                if client_work_cost_idx is not None:
-                    try:
-                        client_work_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
-                        update_data[client_work_cost_idx] = client_work_cost_formula
-                        log.info(f"Set client work cost formula for {specialist.name}: {client_work_cost_formula}")
-                    except Exception as e:
-                        log.warning(f"Failed to set client work cost formula: {str(e)}")
-                
-                if specialist_work_cost_idx is not None:
-                    try:
-                        specialist_work_cost_formula = config_service.get_formula(FormulaName.NET_TOTAL_COST)
-                        update_data[specialist_work_cost_idx] = specialist_work_cost_formula
-                        log.info(f"Set specialist work cost formula for {specialist.name}: {specialist_work_cost_formula}")
-                    except Exception as e:
-                        log.warning(f"Failed to set specialist work cost formula: {str(e)}")
-                
-                if revenue_idx is not None:
-                    try:
-                        revenue_formula = config_service.get_formula(FormulaName.REVENUE)
-                        update_data[revenue_idx] = revenue_formula
-                        log.info(f"Set revenue formula for {specialist.name}: {revenue_formula}")
-                    except Exception as e:
-                        log.warning(f"Failed to set revenue formula: {str(e)}")
-            except Exception as e:
-                log.warning(f"Failed to set one or more cost/revenue formulas: {str(e)}")
-            
-            # Update data
-            target_row = insert_row + 1  # 1-based indexing for range
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}",
-                values=[update_data],
-                value_input_option="USER_ENTERED",
+            # Insert row if needed and update data
+            self._insert_and_update_specialist_row(
+                spreadsheet_id, sheet_name, sheet, insert_row, update_data, headers
             )
             
-            log.info(f"Added {specialist.name} to {sheet_name} tab in row {target_row}")
+            log.info("Added %s to %s tab", specialist.name, sheet_name)
 
         except Exception as e:
-            log.error(f"Error updating Payment Distribution Current Period tab: {str(e)}")
+            log.error("Failed to update Payment Distribution Current Period tab: %s", str(e))
             raise Exception(f"Failed to update Payment Distribution Current Period tab: {str(e)}")
-            
+
+    def _prepare_payment_distribution_row_data(self, headers: List[str], specialist: Specialist) -> List[str]:
+        """Prepare row data for Payment Distribution sheet.
+
+        Args:
+            headers: Column headers
+            specialist: Specialist object
+
+        Returns:
+            List of values for the row
+        """
+        update_data = [""] * len(headers)
+        
+        # Basic specialist information
+        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+        
+        if specialist_idx is not None:
+            update_data[specialist_idx] = specialist.name
+        if role_idx is not None:
+            update_data[role_idx] = specialist.role
+
+        # Add formulas and rates specific to payment distribution
+        self._add_working_hours_formula(update_data, headers)
+        self._add_payment_distribution_formulas(update_data, headers, specialist)
+
+        return update_data
+
+    def _add_payment_distribution_formulas(
+        self, update_data: List[str], headers: List[str], specialist: Specialist
+    ) -> None:
+        """Add Payment Distribution specific formulas and rates.
+
+        Args:
+            update_data: Row data to update
+            headers: Column headers
+            specialist: Specialist object
+        """
+        # Add specialist hourly rate (internal rate)
+        specialist_rate_idx = self._find_column_index(headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
+        if specialist_rate_idx is not None:
+            update_data[specialist_rate_idx] = str(specialist.internal_rate)
+
+        # Add specialist work cost formula 
+        specialist_cost_idx = self._find_column_index(headers, ColumnName.SPECIALIST_WORK_COST_USD.value)
+        if specialist_cost_idx is not None:
+            try:
+                # Use net total cost formula for specialist work cost
+                specialist_cost_formula = config_service.get_formula(FormulaName.NET_TOTAL_COST)
+                update_data[specialist_cost_idx] = specialist_cost_formula
+                log.debug("Added specialist work cost formula")
+            except Exception as e:
+                log.warning("Failed to set specialist work cost formula: %s", str(e))
+                
+        # Add client hourly rate (external rate)
+        client_rate_idx = self._find_column_index(headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
+        if client_rate_idx is not None:
+            update_data[client_rate_idx] = str(specialist.external_rate)
+
+        # Add client work cost formula
+        client_cost_idx = self._find_column_index(headers, ColumnName.CLIENT_WORK_COST_USD.value)
+        if client_cost_idx is not None:
+            try:
+                # Use gross total cost formula for client work cost
+                client_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
+                update_data[client_cost_idx] = client_cost_formula
+                log.debug("Added client work cost formula")
+            except Exception as e:
+                log.warning("Failed to set client work cost formula: %s", str(e))
+                
+        # Add revenue formula
+        revenue_idx = self._find_column_index(headers, ColumnName.REVENUE_USD.value)
+        if revenue_idx is not None:
+            try:
+                revenue_formula = config_service.get_formula(FormulaName.REVENUE)
+                update_data[revenue_idx] = revenue_formula
+                log.debug("Added revenue formula")
+            except Exception as e:
+                log.warning("Failed to set revenue formula: %s", str(e))
+
     def _get_spreadsheet_sheets(self, spreadsheet_id: str) -> List[str]:
         """Get list of sheet names in a spreadsheet.
 
@@ -909,7 +967,7 @@ class TimesheetProjectService:
             return [sheet.get("properties", {}).get("title", "") for sheet in sheets]
 
         except Exception as e:
-            log.error(f"Error getting spreadsheet sheets: {str(e)}")
+            log.error("Error getting spreadsheet sheets: %s", str(e))
             raise Exception(f"Failed to get spreadsheet sheets: {str(e)}")
 
     def _create_specialist_tab_in_report(
@@ -945,10 +1003,10 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
 
-            log.info(f"Created tab for {specialist.name} in report spreadsheet")
+            log.info("Created tab for %s in report spreadsheet", specialist.name)
 
         except Exception as e:
-            log.error(f"Error creating specialist tab in report: {str(e)}")
+            log.error("Error creating specialist tab in report: %s", str(e))
             raise Exception(f"Failed to create specialist tab in report: {str(e)}")
 
     def _create_specialist_tab_in_calculations(
@@ -984,15 +1042,15 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
 
-            log.info(f"Created tab for {specialist.name} in calculations spreadsheet")
+            log.info("Created tab for %s in calculations spreadsheet", specialist.name)
 
         except Exception as e:
-            log.error(f"Error creating specialist tab in calculations: {str(e)}")
+            log.error("Error creating specialist tab in calculations: %s", str(e))
             raise Exception(
                 f"Failed to create specialist tab in calculations: {str(e)}"
             )
             
-    def _find_column_index(self, headers: list, column_name: str) -> int:
+    def _find_column_index(self, headers: List[str], column_name: str) -> Optional[int]:
         """Find the index of a column by its name.
         
         Args:
@@ -1003,7 +1061,7 @@ class TimesheetProjectService:
             Index of the column or None if not found
         """
         for i, header in enumerate(headers):
-            if header == column_name:
+            if header.strip().lower() == column_name.lower():
                 return i
         return None
         
@@ -1044,14 +1102,14 @@ class TimesheetProjectService:
                         "startRowIndex": source_row - 1,
                         "endRowIndex": source_row,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 100  # Достаточно большое число для покрытия всех колонок
+                        "endColumnIndex": 100  # Large enough number to cover all columns
                     },
                     "destination": {
                         "sheetId": sheet_id,
                         "startRowIndex": target_row - 1,
                         "endRowIndex": target_row,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 100  # Достаточно большое число для покрытия всех колонок
+                        "endColumnIndex": 100  # Large enough number to cover all columns
                     },
                     "pasteType": "PASTE_FORMULA",
                     "pasteOrientation": "NORMAL"
@@ -1064,23 +1122,23 @@ class TimesheetProjectService:
                 requests=[request]
             )
             
-            log.info(f"Successfully copied formatting from row {source_row} to row {target_row}")
+            log.info("Successfully copied formatting from row %d to row %d", source_row, target_row)
             
         except Exception as e:
-            log.error(f"Error copying row formatting: {str(e)}")
+            log.error("Error copying row formatting: %s", str(e))
             raise Exception(f"Failed to copy row formatting: {str(e)}")
 
     def _column_letter(self, index: int) -> str:
-        """Convert column index to letter (0 = A, 1 = B, etc.).
+        """Convert column index to letter (A, B, C, etc.).
 
         Args:
-            index: Zero-based index
+            index: Zero-based column index
 
         Returns:
-            Column letter(s)
+            Column letter
         """
         result = ""
         while index >= 0:
-            result = chr(index % 26 + 65) + result
+            result = chr(index % 26 + ord('A')) + result
             index = index // 26 - 1
         return result
