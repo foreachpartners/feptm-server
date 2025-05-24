@@ -11,8 +11,14 @@ from feptm.models.project import Project
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
 from feptm.timesheets.config_service import (
-    config_service, FormulaName, SheetName, ColumnName, 
-    DateFormat, RangeFormat, RowName, UrlPattern
+    ColumnName,
+    DateFormat,
+    FormulaName,
+    RangeFormat,
+    RowName,
+    SheetName,
+    UrlPattern,
+    config_service,
 )
 from feptm.timesheets.specialist_service import SpecialistService
 
@@ -286,7 +292,7 @@ class TimesheetProjectService:
                 spreadsheet_id=project_id, 
                 context=context
             )
-            
+
             if not specialists:
                 log.info("No specialists found in project sheet")
                 return [], 0, 0
@@ -305,13 +311,13 @@ class TimesheetProjectService:
 
     def _validate_and_extract_project(self, project_id: str) -> Project:
         """Validate project exists and extract its metadata.
-
+        
         Args:
             project_id: ID of the project info spreadsheet
-
+            
         Returns:
             Project object with metadata
-
+            
         Raises:
             Exception: If project validation or metadata extraction fails
         """
@@ -548,32 +554,32 @@ class TimesheetProjectService:
         Returns:
             Tuple of (values, headers, sheet) or None if not found
         """
-        if not self.google_sheets_service.sheets_service:
-            raise Exception("Google Sheets service not initialized")
+            if not self.google_sheets_service.sheets_service:
+                raise Exception("Google Sheets service not initialized")
 
-        sheet = self.google_sheets_service.get_sheet_by_name(
-            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
-        )
+            sheet = self.google_sheets_service.get_sheet_by_name(
+                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
+            )
 
-        if not sheet:
+            if not sheet:
             log.warning("Sheet '%s' not found in spreadsheet %s", sheet_name, spreadsheet_id)
             return None
 
         # Get current data
-        range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
-        result = (
-            self.google_sheets_service.sheets_service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_name)
-            .execute()
-        )
+            range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
+            result = (
+                self.google_sheets_service.sheets_service.spreadsheets()
+                .values()
+                .get(spreadsheetId=spreadsheet_id, range=range_name)
+                .execute()
+            )
 
-        values = result.get("values", [])
-        if not values:
+            values = result.get("values", [])
+            if not values:
             log.warning("No data found in sheet '%s'", sheet_name)
             return None
 
-        headers = values[0]
+            headers = values[0]
         return values, headers, sheet
 
     def _specialist_exists_in_current_period(
@@ -613,34 +619,34 @@ class TimesheetProjectService:
         if specialist_idx is None:
             return 1  # Insert after header
 
-        last_data_row = None
-        total_row = None
+            last_data_row = None
+            total_row = None
         has_specialists = False
 
         for i, row in enumerate(values[1:], start=1):  # Skip header
             if len(row) > specialist_idx and row[specialist_idx]:
                 has_specialists = True
-                last_data_row = i
+                    last_data_row = i
                 
             # Check for total row (usually has formula or specific pattern)
-            if i > 0 and len(row) > specialist_idx:
-                if (not row[specialist_idx] or row[specialist_idx] == "0" or 
-                    (len(row) > 2 and "$" in str(row[2]) and not row[0])):
-                    total_row = i
-                    break
+                if i > 0 and len(row) > specialist_idx:
+                    if (not row[specialist_idx] or row[specialist_idx] == "0" or 
+                        (len(row) > 2 and "$" in str(row[2]) and not row[0])):
+                        total_row = i
+                        break
             
         # Determine insert position
         if not has_specialists:
             return 1  # First specialist, use row 2
 
-        if last_data_row is not None:
-            insert_row = last_data_row + 1
-        else:
-            insert_row = 1
+                if last_data_row is not None:
+                    insert_row = last_data_row + 1
+                else:
+                    insert_row = 1
                 
         # Insert before total row if it exists
         if total_row is not None and insert_row >= total_row:
-            insert_row = total_row
+                    insert_row = total_row
                 
         return insert_row
 
@@ -654,7 +660,7 @@ class TimesheetProjectService:
         Returns:
             List of values for the row
         """
-        update_data = [""] * len(headers)
+            update_data = [""] * len(headers)
         
         # Basic specialist information
         specialist_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST.value])
@@ -664,7 +670,7 @@ class TimesheetProjectService:
             update_data[specialist_idx] = specialist.name
         if role_idx is not None:
             update_data[role_idx] = specialist.role
-
+            
         # Add formulas and rates
         self._add_working_hours_formula(update_data, headers)
         self._add_general_expenses_formulas(update_data, headers, specialist)
@@ -679,12 +685,12 @@ class TimesheetProjectService:
             headers: Column headers
         """
         hours_worked_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.HOURS_WORKED.value])
-        if hours_worked_idx is not None:
-            try:
-                working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
-                update_data[hours_worked_idx] = working_hours_formula
+            if hours_worked_idx is not None:
+                try:
+                    working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
+                    update_data[hours_worked_idx] = working_hours_formula
                 log.debug("Added working hours formula")
-            except Exception as e:
+                except Exception as e:
                 log.warning("Failed to set hours calculation formula: %s", str(e))
 
     def _add_general_expenses_formulas(
@@ -699,17 +705,17 @@ class TimesheetProjectService:
         """
         # Add hourly rate
         rate_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.HOURLY_RATE_USD.value])
-        if rate_idx is not None:
-            update_data[rate_idx] = str(specialist.external_rate)
-
+            if rate_idx is not None:
+                update_data[rate_idx] = str(specialist.external_rate)
+                
         # Add total cost formula
         total_cost_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.TOTAL_COST_USD.value])
-        if total_cost_idx is not None:
-            try:
-                gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
-                update_data[total_cost_idx] = gross_total_cost_formula
+            if total_cost_idx is not None:
+                try:
+                    gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
+                    update_data[total_cost_idx] = gross_total_cost_formula
                 log.debug("Added total cost formula")
-            except Exception as e:
+                except Exception as e:
                 log.warning("Failed to set total cost formula: %s", str(e))
 
     def _insert_and_update_specialist_row(
@@ -760,13 +766,13 @@ class TimesheetProjectService:
         target_row = insert_row + 1  # Convert to 1-based indexing
         range_name = f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}"
         
-        self.google_sheets_service.update_range(
-            spreadsheet_id=spreadsheet_id,
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
             range_name=range_name,
-            values=[update_data],
-            value_input_option="USER_ENTERED",
-        )
-
+                values=[update_data],
+                value_input_option="USER_ENTERED",
+            )
+            
     def _update_payment_distribution_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
     ) -> None:
@@ -782,7 +788,7 @@ class TimesheetProjectService:
         try:
             sheet_name = SheetName.CURRENT_PERIOD.value
             sheet_data = self._get_current_period_sheet_data(spreadsheet_id, sheet_name)
-            
+
             if not sheet_data:
                 return
 
@@ -828,7 +834,7 @@ class TimesheetProjectService:
             update_data[specialist_idx] = specialist.name
         if role_idx is not None:
             update_data[role_idx] = specialist.role
-
+            
         # Add formulas and rates specific to payment distribution
         self._add_working_hours_formula(update_data, headers)
         self._add_payment_distribution_formulas(update_data, headers, specialist)
@@ -847,9 +853,9 @@ class TimesheetProjectService:
         """
         # Add specialist hourly rate (internal rate)
         specialist_rate_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_HOURLY_RATE_USD.value])
-        if specialist_rate_idx is not None:
-            update_data[specialist_rate_idx] = str(specialist.internal_rate)
-
+            if specialist_rate_idx is not None:
+                update_data[specialist_rate_idx] = str(specialist.internal_rate)
+            
         # Add specialist work cost formula 
         specialist_cost_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_WORK_COST_USD.value])
         if specialist_cost_idx is not None:
@@ -858,7 +864,7 @@ class TimesheetProjectService:
                 specialist_cost_formula = config_service.get_formula(FormulaName.NET_TOTAL_COST)
                 update_data[specialist_cost_idx] = specialist_cost_formula
                 log.debug("Added specialist work cost formula")
-            except Exception as e:
+                    except Exception as e:
                 log.warning("Failed to set specialist work cost formula: %s", str(e))
                 
         # Add client hourly rate (external rate)
@@ -874,19 +880,19 @@ class TimesheetProjectService:
                 client_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
                 update_data[client_cost_idx] = client_cost_formula
                 log.debug("Added client work cost formula")
-            except Exception as e:
+                    except Exception as e:
                 log.warning("Failed to set client work cost formula: %s", str(e))
                 
         # Add revenue formula
         revenue_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.REVENUE_USD.value])
-        if revenue_idx is not None:
-            try:
-                revenue_formula = config_service.get_formula(FormulaName.REVENUE)
-                update_data[revenue_idx] = revenue_formula
+                if revenue_idx is not None:
+                    try:
+                        revenue_formula = config_service.get_formula(FormulaName.REVENUE)
+                        update_data[revenue_idx] = revenue_formula
                 log.debug("Added revenue formula")
-            except Exception as e:
+                    except Exception as e:
                 log.warning("Failed to set revenue formula: %s", str(e))
-
+            
     def _get_spreadsheet_sheets(self, spreadsheet_id: str) -> List[str]:
         """Get list of sheet names in a spreadsheet.
 

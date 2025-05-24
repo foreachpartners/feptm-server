@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
     GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
-    
+
     # Config sheet ID for formulas
     GOOGLE_CONFIG_SHEET_ID: Optional[str] = None
 

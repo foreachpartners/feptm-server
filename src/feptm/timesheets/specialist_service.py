@@ -10,7 +10,11 @@ from feptm.models.context import TimesheetContext
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
 from feptm.timesheets.config_service import (
-    config_service, ColumnName, DateFormat, RangeFormat, SheetName
+    ColumnName,
+    DateFormat,
+    RangeFormat,
+    SheetName,
+    config_service,
 )
 
 
@@ -165,11 +169,11 @@ class SpecialistService:
             Exception: If sheet cannot be read or is invalid
         """
         # Check if sheet exists
-        sheet = self.google_sheets_service.get_sheet_by_name(
-            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
-        )
+            sheet = self.google_sheets_service.get_sheet_by_name(
+                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
+            )
 
-        if not sheet:
+            if not sheet:
             log.warning("Sheet '%s' not found in spreadsheet %s", sheet_name, spreadsheet_id)
             return [], []
 
@@ -404,9 +408,9 @@ class SpecialistService:
 
         # Find specialists that need timesheet ID updates
         updates = []
-        for specialist in specialists:
-            if not specialist.timesheet:
-                continue
+            for specialist in specialists:
+                if not specialist.timesheet:
+                    continue
 
             # Find the row for this specialist using utility
             row_idx = self.google_sheets_service.find_specialist_row_index(values, name_col_idx, specialist.name)
@@ -442,8 +446,8 @@ class SpecialistService:
         for row_idx, timesheet_id in updates:
             update_range = f"{sheet_name}!{timesheet_col_letter}{row_idx}"
             
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
+                        self.google_sheets_service.update_range(
+                            spreadsheet_id=spreadsheet_id,
                 range_name=update_range,
                 values=[[timesheet_id]],
                 value_input_option="RAW",

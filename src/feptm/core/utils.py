@@ -60,7 +60,7 @@ def parse_decimal_safely(value: str, default: Decimal = Decimal("0")) -> Decimal
     """
     if not value or not value.strip():
         return default
-    
+
     try:
         # Replace comma with dot for European number format
         cleaned_value = value.strip().replace(",", ".")
@@ -81,7 +81,7 @@ def parse_date_safely(value: str, date_format: str) -> Optional[datetime]:
     """
     if not value or not value.strip():
         return None
-    
+
     try:
         return datetime.strptime(value.strip(), date_format)
     except ValueError:
@@ -99,7 +99,7 @@ def clean_string_value(value: str) -> Optional[str]:
     """
     if not value:
         return None
-    
+
     cleaned = value.strip()
     return cleaned if cleaned else None
 
@@ -115,11 +115,11 @@ def validate_required_fields(data: dict, required_fields: List[str]) -> List[str
         List of missing field names
     """
     missing_fields = []
-    
+
     for field in required_fields:
         if field not in data or not data[field]:
             missing_fields.append(field)
-    
+
     return missing_fields
 
 
@@ -147,20 +147,20 @@ def extract_id_from_hyperlink_formula(formula: str) -> Optional[str]:
     """
     if not formula:
         return None
-    
+
     # Handle both HYPERLINK formulas and direct URLs
     try:
         url = formula
-        
+
         # If it's a HYPERLINK formula, extract the URL
         if "HYPERLINK" in formula:
             # HYPERLINK formula format: =HYPERLINK("url"; "text") or =HYPERLINK("url", "text")
             start_quote = formula.find('"') + 1
             end_quote = formula.find('"', start_quote)
-            
+
             if start_quote > 0 and end_quote > start_quote:
                 url = formula[start_quote:end_quote]
-        
+
         # Extract ID from URL
         if "drive.google.com" in url:
             # For drive folders: https://drive.google.com/drive/folders/FOLDER_ID
@@ -169,20 +169,22 @@ def extract_id_from_hyperlink_formula(formula: str) -> Optional[str]:
             # For files: https://drive.google.com/file/d/FILE_ID
             elif "/file/d/" in url:
                 return url.split("/file/d/")[-1].split("/")[0]
-                
+
         elif "docs.google.com/spreadsheets" in url:
             # For spreadsheets: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID
             if "/spreadsheets/d/" in url:
                 return url.split("/spreadsheets/d/")[-1].split("/")[0].split("?")[0]
-        
+
         # Fallback: try to extract ID as last part after /
         if "/" in url:
             potential_id = url.split("/")[-1].split("?")[0]
             # Check if it looks like a Google ID (alphanumeric, underscores, hyphens)
-            if len(potential_id) > 20 and all(c.isalnum() or c in "_-" for c in potential_id):
+            if len(potential_id) > 20 and all(
+                c.isalnum() or c in "_-" for c in potential_id
+            ):
                 return potential_id
-    
+
     except Exception:
         pass
-    
+
     return None

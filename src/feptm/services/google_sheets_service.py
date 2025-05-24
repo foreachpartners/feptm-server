@@ -556,8 +556,10 @@ class GoogleSheetsService:
             raise Exception(f"Failed to batch update spreadsheet: {error}")
 
     # Utility methods for Google Sheets operations
-    
-    def find_column_index(self, headers: List[str], column_names: List[str]) -> Optional[int]:
+
+    def find_column_index(
+        self, headers: List[str], column_names: List[str]
+    ) -> Optional[int]:
         """Find column index by possible header names.
 
         Args:
@@ -584,7 +586,7 @@ class GoogleSheetsService:
         """
         result = ""
         while col_idx >= 0:
-            result = chr(col_idx % 26 + ord('A')) + result
+            result = chr(col_idx % 26 + ord("A")) + result
             col_idx = col_idx // 26 - 1
         return result
 
@@ -599,16 +601,18 @@ class GoogleSheetsService:
         """
         result = 0
         for char in letter.upper():
-            result = result * 26 + (ord(char) - ord('A') + 1)
+            result = result * 26 + (ord(char) - ord("A") + 1)
         return result - 1
 
-    def format_range(self, sheet_name: str, start_col: str, end_col: str, row: int) -> str:
+    def format_range(
+        self, sheet_name: str, start_col: str, end_col: str, row: int
+    ) -> str:
         """Format a range string for Google Sheets API.
 
         Args:
             sheet_name: Name of the sheet
             start_col: Starting column letter
-            end_col: Ending column letter  
+            end_col: Ending column letter
             row: Row number
 
         Returns:
@@ -616,7 +620,9 @@ class GoogleSheetsService:
         """
         return f"{sheet_name}!{start_col}{row}:{end_col}{row}"
 
-    def find_specialist_row_index(self, values: List[List], name_col_idx: int, specialist_name: str) -> Optional[int]:
+    def find_specialist_row_index(
+        self, values: List[List], name_col_idx: int, specialist_name: str
+    ) -> Optional[int]:
         """Find row index for a specialist by name.
 
         Args:
@@ -632,7 +638,9 @@ class GoogleSheetsService:
                 return i
         return None
 
-    def get_sheet_data_with_headers(self, spreadsheet_id: str, sheet_name: str, range_format: str) -> tuple[List[List], List[str]]:
+    def get_sheet_data_with_headers(
+        self, spreadsheet_id: str, sheet_name: str, range_format: str
+    ) -> tuple[List[List], List[str]]:
         """Get sheet data along with headers.
 
         Args:
@@ -651,7 +659,7 @@ class GoogleSheetsService:
 
         # Format the range with sheet name
         range_name = range_format.format(sheet_name=sheet_name)
-        
+
         try:
             result = (
                 self.sheets_service.spreadsheets()
