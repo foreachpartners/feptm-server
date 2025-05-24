@@ -2,7 +2,7 @@
 
 ## Ключевые слова
 
-FastAPI >=0.110.0, Python >=3.12, Google Sheets API v4, OAuth 2.0, Next.js >=14, React >=18, React Query >=4, Tailwind CSS >=3, uvicorn >=0.29.0, Ubuntu 24.04 LTS, nginx >=1.24, systemd, OpenAPI 3.0, REST API, VPS, Google Drive API v3, Telegram Bot API (optional), Time & Materials accounting, Google Apps Script (optional), Single Source of Truth (Google Sheets)
+FastAPI >=0.110.0, Python >=3.12, Google Sheets API v4, OAuth 2.0, Google Drive API v3, uvicorn >=0.29.0, Ubuntu 24.04 LTS, nginx >=1.24, systemd, OpenAPI 3.0, REST API, VPS, Time & Materials accounting, Single Source of Truth (Google Sheets), pydantic >=2.0.0, uv (package manager)
 
 ### 1. Цель разработки
 Разработка бекенд-сервиса для автоматизации учета трудозатрат команды разработки по модели Time & Materials с использованием Google Sheets API.
@@ -31,88 +31,260 @@ FastAPI >=0.110.0, Python >=3.12, Google Sheets API v4, OAuth 2.0, Next.js >=14,
 
 ---
 
-### Технические требования:
+### 3. Технические требования
 
-#### Стек технологий
+#### 3.1 Стек технологий
 
-- Язык разработки: **Python**
-- Веб-фреймворк: **FastAPI**
-- Google Sheets API
-- Система авторизации и аутентификации: OAuth 2.0 для доступа к Google API
-- VPS на Ubuntu 24.04
-- Веб-сервер: nginx (reverse proxy)
+- **Язык разработки:** Python >=3.12
+- **Веб-фреймворк:** FastAPI >=0.110.0
+- **Пакетный менеджер:** uv (современная замена pip/poetry)
+- **Валидация данных:** Pydantic >=2.0.0
+- **Google APIs:** Google Sheets API v4, Google Drive API v3
+- **Система авторизации:** OAuth 2.0 для доступа к Google API
+- **ASGI сервер:** uvicorn >=0.29.0
+- **Операционная система:** Ubuntu 24.04 LTS
+- **Веб-сервер:** nginx (reverse proxy)
+- **Процесс-менеджер:** systemd
 
-### Требования к функциональности
+#### 3.2 Архитектура проекта
 
-#### REST API endpoints:
+**Структура проекта:**
+```
+src/feptm/
+├── main.py                     # Основной модуль приложения
+├── core/
+│   ├── config.py              # Конфигурация приложения
+│   └── log.py                 # Логирование
+├── api/
+│   ├── router.py              # Основной роутер
+│   └── v1/
+│       └── projects.py        # API эндпоинты проектов
+├── models/
+│   ├── project.py             # Модель проекта
+│   └── specialist.py          # Модель специалиста
+├── services/
+│   └── google_sheets_service.py  # Сервис Google Sheets API
+└── timesheets/
+    ├── project_service.py     # Сервис управления проектами
+    ├── specialist_service.py  # Сервис управления специалистами
+    └── config_service.py      # Конфигурация таймшитов
+```
 
-- `/projects/create` (POST)
-  - Создание нового проекта с автоматической настройкой Google Sheets и доступов.
+#### 3.3 Требования к функциональности
 
-- `/projects/{project_id}/specialists`
-  - POST: Добавить специалиста.
-  - PUT: Обновить данные специалиста (ставка, дата подключения/отключения).
-  - DELETE: Отключить специалиста от проекта.
+**Реализованные REST API endpoints:**
 
-- `/timesheets`:
-  - POST: Генерация таймшита для специалиста по шаблону.
+- `POST /api/v1/projects/create`
+  - Создание нового проекта с автоматической настройкой Google Sheets и доступов
+  - Создает папку в Google Drive, проектную документацию, отчеты и расчеты
 
-- `/reports`:
-  - POST: Генерация сводного отчета по затратам.
+- `POST /api/v1/projects/sync`
+  - Синхронизация специалистов проекта
+  - Анализ проектной таблицы и создание таймшитов для новых специалистов
 
-- `/periods`:
-  - POST: Создание нового периода оплаты.
-  - PUT: Закрытие периода оплаты и генерация итогов.
+**Требуемые к реализации REST API endpoints:**
 
-### Модели данных:
-- **Специалист:**
-  - id (UUID)
-  - full_name
-  - role
-  - email
-  - rate_per_hour
-  - start_date
-  - end_date (опционально)
+- `/api/v1/periods`
+  - PUT: Закрытие периода оплаты и генерация итогов
 
-- **Проект:**
-  - id (UUID)
-  - name
-  - description
-  - google_folder_id (папка Google Drive)
+**Управление через Google Sheets:**
 
-- **Период оплаты:**
-  - id (UUID)
-  - project_id
-  - period_name
-  - start_date
-  - end_date
+- **Добавление специалистов:** Осуществляется напрямую через редактирование листа "Team" в проектной информации ([пример](https://docs.google.com/spreadsheets/d/1g5HOLcGjqKLXbTJA4IOXzBQP0oecPmqtst--T3zGdbo/edit?gid=1900084802#gid=1900084802))
+- **Генерация таймшитов:** Автоматически происходит в эндпоинте `/api/v1/projects/sync` при обнаружении новых специалистов
+- **Генерация отчетов:** Автоматически происходит в эндпоинте `/api/v1/projects/sync` с созданием связанных документов
 
-### Архитектурные особенности:
-- Вся информация хранится исключительно в Google Sheets (не используется отдельная база данных).
-- Google Sheets используется как единый источник данных (Single Source of Truth).
-- Бэкенд обрабатывает запросы фронтенда и напрямую работает с Google Sheets API.
+#### 3.4 Модели данных
 
-### Требования по развертыванию:
-- FastAPI развернут через uvicorn, запуск осуществляется с использованием systemd.
-- Доступ по HTTPS с использованием nginx в качестве reverse proxy.
-- Предусмотреть отдельный конфигурационный файл (.env) для переменных среды (ключи API, ссылки на шаблоны).
+**Специалист:**
+```python
+- name: str                    # Полное имя
+- role: str                    # Роль (Developer, QA, Designer, Project Manager, DevOps)
+- project: Optional[str]       # Название проекта
+- internal_rate: Decimal       # Внутренняя ставка за час
+- external_rate: Decimal       # Ставка для клиента за час  
+- date: Optional[datetime]     # Дата подключения
+- timesheet: Optional[str]     # ID таймшита в Google Sheets
+```
 
-### Ограничения и допущения:
-- На данном этапе не предусматривается уведомления специалистов.
-- Отсутствует отдельная БД, все данные хранятся в Google Sheets.
-- Фронтенд реализуется отдельно (Next.js приложение).
+**Проект:**
+```python
+- name: str                           # Название проекта
+- drive_folder_id: Optional[str]      # ID папки в Google Drive
+- project_info_spreadsheet_id: Optional[str]    # ID проектной информации
+- report_spreadsheet_id: Optional[str]          # ID отчета
+- calculations_spreadsheet_id: Optional[str]    # ID расчетов
+- created: datetime                   # Дата создания
+- modified: datetime                  # Дата изменения
+```
 
-### Критерии приемки:
-- Создание, обновление и удаление специалистов через API корректно отображается в Google Sheets.
-- Таймшиты создаются и корректно наполняются формулами на основании заданного шаблона.
-- Периоды оплаты формируются корректно и рассчитывают актуальные суммы.
-- Внесение изменений (ставок, ролей, даты подключения) немедленно отражается во всех связанных Google Sheets.
-- Доступы для специалистов корректно выставляются автоматически.
+**Период оплаты (требуется реализация):**
+```python
+- id: UUID                     # Уникальный идентификатор
+- project_id: UUID            # ID проекта
+- period_name: str            # Название периода
+- start_date: datetime        # Дата начала
+- end_date: datetime          # Дата окончания
+```
 
-### Порядок сдачи работ:
-- Код размещается в приватном репозитории Git.
-- Разработка ведется с использованием Gitflow.
-- API должен быть документирован с помощью OpenAPI (автоматически средствами FastAPI).
+#### 3.5 Архитектурные особенности
+
+- **Single Source of Truth:** Вся информация хранится исключительно в Google Sheets (не используется отдельная база данных)
+- **Google Sheets как БД:** Google Sheets используется как единый источник данных
+- **API Gateway:** Бэкенд обрабатывает запросы фронтенда и напрямую работает с Google Sheets API
+- **Шаблонный подход:** Все документы создаются на основе заранее подготовленных шаблонов
+- **OAuth интеграция:** Полная интеграция с Google OAuth 2.0 для безопасного доступа
+
+#### 3.6 Конфигурация
+
+**Переменные окружения (.env):**
+```bash
+# Google API
+GOOGLE_CREDENTIALS_FILE=credentials.json
+GOOGLE_TOKEN_FILE=~/.google_sheets_token.json
+GOOGLE_TIMESHEET_TEMPLATE_ID=your_template_id
+GOOGLE_PROJECT_INFO_TEMPLATE_ID=your_template_id
+GOOGLE_PROJECT_REPORT_TEMPLATE_ID=your_template_id
+GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID=your_template_id
+GOOGLE_PROJECTS_FOLDER_ID=your_folder_id
+
+# Application
+PROJECT_NAME="Time & Materials Accounting API"
+VERSION=0.1.0
+HOST=0.0.0.0
+PORT=8000
+DEBUG=true
+```
+
+#### 3.7 Требования по развертыванию
+
+- **Python окружение:** Python >=3.12 с использованием uv для управления зависимостями
+- **ASGI сервер:** FastAPI развернут через uvicorn, запуск осуществляется с использованием systemd
+- **Reverse proxy:** Доступ по HTTPS с использованием nginx в качестве reverse proxy
+- **Конфигурация:** Отдельный конфигурационный файл (.env) для переменных среды
+- **Логирование:** Структурированное логирование для отладки и мониторинга
+- **Документация API:** Автоматическая генерация OpenAPI 3.0 документации средствами FastAPI
+
+#### 3.8 Зависимости проекта
+
+**Основные зависимости:**
+```toml
+fastapi>=0.110.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.2.0
+uvicorn>=0.29.0
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+google-auth-oauthlib>=0.4.0
+email-validator>=2.2.0
+```
+
+**Инструменты разработки:**
+```toml
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
+pytest-cov>=4.0.0
+flake8>=7.0.0
+```
+
+### 4. Результаты работы эндпоинтов
+
+На основе тестирования эндпоинтов `/create` и `/sync` можно наблюдать следующие результаты:
+
+#### 4.1 Эндпоинт `/api/v1/projects/create`
+
+**Результат:** Создает комплексную структуру документов проекта в Google Drive:
+
+1. **Папка проекта** - организует все документы проекта в Google Drive
+2. **Проектная информация** - основной документ ([пример](https://docs.google.com/spreadsheets/d/1g5HOLcGjqKLXbTJA4IOXzBQP0oecPmqtst--T3zGdbo/edit?gid=1900084802#gid=1900084802)) с:
+   - Листом "Project info" с метаданными проекта:
+     - Project ID, Name, Created/Modified даты
+     - Ссылки на Project Folder, Payment Distribution, General Expenses
+   - Листом "Team" для управления специалистами команды
+3. **Отчет проекта (General Expenses)** - документ для сводных отчетов:
+   - Лист "Current Period" - текущий период с данными по специалистам
+   - Индивидуальные листы для каждого специалиста с IMPORTRANGE формулами
+4. **Расчеты проекта (Payment Distribution)** - документ для финансовых расчетов:
+   - Лист "Current Period" - расчеты оплат по специалистам
+   - Связывание с таймшитами через формулы
+
+**Возвращаемые данные:**
+- `drive_folder_id` и `drive_folder_url` - папка проекта
+- `project_info_spreadsheet_id` и `project_info_spreadsheet_url` - проектная информация
+- `report_spreadsheet_id` и `report_spreadsheet_url` - отчеты
+- `calculations_spreadsheet_id` и `calculations_spreadsheet_url` - расчеты
+
+#### 4.2 Эндпоинт `/api/v1/projects/sync`
+
+**Результат:** Автоматически создает персональные таймшиты для специалистов:
+
+**Процесс синхронизации:**
+1. Анализирует лист "Team" в проектной информации ([пример документа](https://docs.google.com/spreadsheets/d/1g5HOLcGjqKLXbTJA4IOXzBQP0oecPmqtst--T3zGdbo/edit?gid=1900084802#gid=1900084802))
+2. Извлекает данные специалистов (имя, роль, внутренние и внешние ставки)
+3. Создает персональные таймшиты для специалистов, у которых их еще нет
+4. Обновляет лист "Team" с ID созданных таймшитов
+5. Автоматически создает вкладки специалистов в отчетах (General Expenses) и расчетах (Payment Distribution)
+6. Связывает все документы через IMPORTRANGE формулы для реального времени обновления
+
+**Возвращаемые данные:**
+- `specialists_found` - общее количество найденных специалистов
+- `specialists_created` - количество созданных таймшитов
+- `specialists[]` - массив объектов специалистов с их данными
+
+**Структура таймшита:** ([пример таймшита](https://docs.google.com/spreadsheets/d/1h1vD0gbf68Cpveq3Ohg7KW3V7tAnNUVu4cUQjgMPM-4/edit?usp=sharing))
+- **Date** (колонка A) - дата выполнения работы
+- **Project** (колонка B) - название проекта
+- **Task Name** (колонка C) - описание выполненной задачи
+- **Work Hours** (колонка D) - количество отработанных часов
+- **Payment Period** (колонка E) - период оплаты (заполняется Project Manager)
+- **Payment Status** (колонка F) - статус оплаты (заполняется Project Manager)
+
+**Особенности таймшитов:**
+- Создаются на основе шаблона с предустановленной структурой
+- Название формируется по шаблону: "Time Tracking for [Имя специалиста]. Project [Название проекта]"
+- Автоматически размещаются в папке проекта
+- Содержат 100 строк для записей (строки 1-100)
+- Интегрируются с отчетными документами через IMPORTRANGE формулы
+
+#### 4.3 Интеграция документов
+
+Созданные документы автоматически связываются между собой:
+
+**Связи таймшитов с отчетами:**
+- В листе "Current Period" отчета автоматически добавляются строки для каждого специалиста
+- Создаются индивидуальные вкладки специалистов с IMPORTRANGE формулами
+- Формулы импортируют данные напрямую из таймшитов специалистов
+
+**Связи отчетов с расчетами:**
+- Лист "Current Period" в расчетах получает данные из отчетов
+- Автоматически рассчитываются суммы по специалистам и проекту
+- Поддерживается разделение внутренних и клиентских ставок
+
+**Структура колонок в отчетах:**
+- Specialist, Specialist Role, Hours Worked
+- Hourly Rate (USD), Total Cost (USD)
+- Client Hourly Rate (USD), Client Work Cost (USD)
+- Specialist Work Cost (USD), Revenue (USD)
+
+**Обновления в реальном времени:**
+- Изменения в таймшитах автоматически отражаются в отчетах
+- Расчеты обновляются при изменении ставок специалистов
+- Формулы поддерживают корректную работу при добавлении новых записей
+
+### 5. Ограничения и допущения
+
+- На данном этапе не предусматривается уведомления специалистов
+- Отсутствует отдельная БД, все данные хранятся в Google Sheets
+- Фронтенд реализуется отдельно (Next.js приложение)
+- Доступ к шаблонам Google Sheets должен быть настроен с правами "Доступ по ссылке"
+- Таймшиты содержат фиксированное количество строк (100) для записей времени
+- Управление периодами оплаты и статусами происходит вручную через Project Manager
+- **Управление специалистами** происходит напрямую через редактирование листа "Team" в Google Sheets, а не через API
+- **Генерация таймшитов и отчетов** происходит автоматически в эндпоинте `/sync`, а не через отдельные эндпоинты
+- Единственный планируемый эндпоинт для периодов - закрытие периода оплаты
 
 ---
 
