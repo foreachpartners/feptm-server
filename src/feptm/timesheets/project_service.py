@@ -1044,6 +1044,11 @@ class TimesheetProjectService:
             )
 
             # Add IMPORTRANGE formula directly in cell A1
+            if specialist.timesheet is None:
+                raise ValueError(
+                    f"Specialist {specialist.name} does not have a timesheet ID"
+                )
+
             import_formula = config_service.get_import_specialist_timesheet_formula(
                 specialist_timesheet_id=specialist.timesheet
             )
@@ -1083,6 +1088,11 @@ class TimesheetProjectService:
             )
 
             # Add IMPORTRANGE formula directly in cell A1
+            if specialist.timesheet is None:
+                raise ValueError(
+                    f"Specialist {specialist.name} does not have a timesheet ID"
+                )
+
             import_formula = config_service.get_import_specialist_timesheet_formula(
                 specialist_timesheet_id=specialist.timesheet
             )
@@ -1118,6 +1128,9 @@ class TimesheetProjectService:
         """
         try:
             # Get sheet ID for the requests
+            if not self.google_sheets_service.sheets_service:
+                raise Exception("Google Sheets service not initialized")
+
             sheet_id = None
             spreadsheet = (
                 self.google_sheets_service.sheets_service.spreadsheets()

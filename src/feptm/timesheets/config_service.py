@@ -97,7 +97,7 @@ class UrlPattern:
 class ConfigService:
     """Service for accessing configuration from Google Sheets."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the service."""
         self.google_sheets_service = google_sheets_service
         self._formula_cache: Dict[str, str] = {}
@@ -139,6 +139,9 @@ class ConfigService:
                 )
 
             # Get the formulas data
+            if not self.google_sheets_service.sheets_service:
+                raise Exception("Google Sheets service not initialized")
+
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -156,8 +159,8 @@ class ConfigService:
             # Skip header row and process formulas
             for row in values[1:]:
                 if len(row) >= 2:  # Should have at least formula name and value
-                    current_formula_name = row[0].strip()
-                    formula_value = row[1].strip()
+                    current_formula_name = cast(str, row[0]).strip()
+                    formula_value = cast(str, row[1]).strip()
 
                     # Add to cache regardless if it's the one we're looking for
                     if formula_value:

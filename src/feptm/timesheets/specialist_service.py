@@ -264,7 +264,14 @@ class SpecialistService:
 
         for row in values[1:]:  # Skip header row
             # Skip empty rows
-            if not row or len(row) <= max(headers_map["name"], headers_map["role"]):
+            name_idx = headers_map["name"]
+            role_idx = headers_map["role"]
+            
+            # Both name and role columns should exist due to validation, but double-check
+            if name_idx is None or role_idx is None:
+                raise Exception("Required columns 'name' or 'role' not found after validation")
+            
+            if not row or len(row) <= max(name_idx, role_idx):
                 continue
 
             specialist = self._parse_specialist_row(row, headers_map)
@@ -321,11 +328,18 @@ class SpecialistService:
             Specialist object or None if row is invalid
         """
         # Get required fields
+        name_idx = headers_map["name"]
+        role_idx = headers_map["role"]
+
         name = (
-            row[headers_map["name"]].strip() if headers_map["name"] < len(row) else ""
+            row[name_idx].strip()
+            if name_idx is not None and name_idx < len(row)
+            else ""
         )
         role = (
-            row[headers_map["role"]].strip() if headers_map["role"] < len(row) else ""
+            row[role_idx].strip()
+            if role_idx is not None and role_idx < len(row)
+            else ""
         )
 
         # Skip rows with empty required fields
@@ -555,6 +569,11 @@ class SpecialistService:
             List of rows with formatted data for the report
         """
         # Get IMPORTRANGE formula from config
+        if specialist.timesheet is None:
+            raise ValueError(
+                f"Specialist {specialist.name} does not have a timesheet ID"
+            )
+
         import_formula = config_service.get_import_specialist_timesheet_formula(
             specialist_timesheet_id=specialist.timesheet
         )
