@@ -3,8 +3,10 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from feptm.core import utils
 from feptm.core.config import settings
 from feptm.core.log import log
+from feptm.models.context import TimesheetContext
 from feptm.models.project import Project
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
@@ -250,12 +252,11 @@ class TimesheetProjectService:
     ) -> Tuple[List[Specialist], int, int]:
         """Synchronize specialists from project info sheet.
 
-        This method:
+        This method coordinates the entire synchronization process:
         1. Validates project exists and extracts metadata
-        2. Extracts specialists info from the project info sheet
-        3. Creates timesheets for specialists who don't have them
-        4. Updates the specialists info sheet with timesheet IDs
-        5. Links specialist timesheets to report and calculation sheets
+        2. Creates timesheet context for specialists
+        3. Delegates specialist synchronization to SpecialistService
+        4. Links specialist timesheets to report and calculation sheets
 
         Args:
             project_id: ID of the project info spreadsheet
@@ -270,21 +271,28 @@ class TimesheetProjectService:
             # Validate project and get metadata
             project = self._validate_and_extract_project(project_id)
             
-            # Get specialists from project sheet
-            specialists, existing_count = self._get_project_specialists(project_id)
+            # Check if we have required data for timesheet creation
+            if not project.drive_folder_id:
+                raise Exception(f"Cannot create timesheets: drive folder ID not found for project '{project.name}'. Please ensure the project folder is properly linked in the project info sheet.")
+            
+            # Create context for timesheet operations
+            context = TimesheetContext(
+                folder_id=project.drive_folder_id,
+                project_name=project.name
+            )
+
+            # Delegate specialist synchronization
+            specialists, new_count = self.specialist_service.sync_specialists(
+                spreadsheet_id=project_id, 
+                context=context
+            )
+            
             if not specialists:
                 log.info("No specialists found in project sheet")
                 return [], 0, 0
 
-            # Create timesheets for specialists without them
-            new_specialists = self._create_missing_timesheets(project, specialists)
-            new_count = len(new_specialists)
-
-            # Update project sheet with new timesheet IDs
-            if new_count > 0:
-                self._update_project_with_timesheets(project_id, new_specialists)
-
-            # Link timesheets to reports and calculations
+            # Link timesheets to reports and calculations for new specialists
+            new_specialists = [s for s in specialists if s.timesheet and new_count > 0]
             if new_specialists:
                 self._link_timesheets_to_reports(project, new_specialists)
 
@@ -314,74 +322,6 @@ class TimesheetProjectService:
             raise Exception(f"Project with ID {project_id} not found: {str(e)}")
 
         return self._extract_project_metadata(project_id)
-
-    def _get_project_specialists(self, project_id: str) -> Tuple[List[Specialist], int]:
-        """Get specialists from project info sheet.
-
-        Args:
-            project_id: ID of the project info spreadsheet
-
-        Returns:
-            Tuple of (specialists_list, existing_timesheets_count)
-        """
-        specialists, existing_count = self.specialist_service.get_specialists_from_sheet(
-            spreadsheet_id=project_id, sheet_name=SheetName.TEAM.value
-        )
-        
-        log.info("Found %d specialists, %d with existing timesheets", len(specialists), existing_count)
-        return specialists, existing_count
-
-    def _create_missing_timesheets(self, project: Project, specialists: List[Specialist]) -> List[Specialist]:
-        """Create timesheets for specialists who don't have them.
-
-        Args:
-            project: Project object with metadata
-            specialists: List of all specialists
-
-        Returns:
-            List of specialists for whom new timesheets were created
-
-        Raises:
-            Exception: If project folder ID is missing
-        """
-        if not project.drive_folder_id:
-            log.warning("Project drive folder ID is missing, cannot create timesheets")
-            return []
-
-        new_specialists = []
-        for specialist in specialists:
-            if not specialist.timesheet:
-                try:
-                    # Make sure folder_id is not None
-                    if not project.drive_folder_id:
-                        log.warning("Project drive folder ID is missing, cannot create timesheets")
-                        break
-
-                    # Create timesheet
-                    result = self.specialist_service.create_specialist_timesheet(
-                        specialist=specialist,
-                        project_name=project.name,
-                        folder_id=project.drive_folder_id,
-                    )
-                    new_specialists.append(specialist)
-                    log.debug("Created timesheet for %s", specialist.name)
-                except Exception as e:
-                    log.error("Failed to create timesheet for %s: %s", specialist.name, str(e))
-
-        return new_specialists
-
-    def _update_project_with_timesheets(self, project_id: str, specialists: List[Specialist]) -> None:
-        """Update project sheet with new timesheet IDs.
-
-        Args:
-            project_id: ID of the project info spreadsheet
-            specialists: List of specialists with new timesheets
-        """
-        self.specialist_service.update_specialists_sheet(
-            spreadsheet_id=project_id,
-            sheet_name=SheetName.TEAM.value,
-            specialists=specialists
-        )
 
     def _link_timesheets_to_reports(self, project: Project, specialists: List[Specialist]) -> None:
         """Link specialist timesheets to report and calculation sheets.
@@ -443,35 +383,38 @@ class TimesheetProjectService:
                 field = row[0].strip()
                 value = row[1].strip()
 
+                log.debug("Processing field: '%s' with value: '%s'", field, value)
+
                 if field == RowName.NAME.value:
                     project_name = value
+                    log.debug("Found project name: %s", project_name)
                 elif field == RowName.PROJECT_FOLDER.value:
-                    # Extract folder ID from HYPERLINK formula or URL
-                    if UrlPattern.DRIVE_FOLDERS_SEGMENT in value:
-                        drive_folder_id = (
-                            value.split(UrlPattern.DRIVE_FOLDERS_SEGMENT)[-1]
-                            .split('"')[0]
-                            .split(";")[0]
-                        )
+                    # Extract folder ID from HYPERLINK formula using utility
+                    drive_folder_id = utils.extract_id_from_hyperlink_formula(value)
+                    log.debug("Extracted drive_folder_id: %s from value: %s", drive_folder_id, value)
                 elif field == RowName.GENERAL_EXPENSES.value:
-                    # Extract report ID from HYPERLINK formula or URL
-                    if UrlPattern.SPREADSHEETS_SEGMENT in value:
-                        report_spreadsheet_id = (
-                            value.split(UrlPattern.SPREADSHEETS_SEGMENT)[-1]
-                            .split('"')[0]
-                            .split(";")[0]
-                        )
+                    # Extract report ID from HYPERLINK formula using utility
+                    report_spreadsheet_id = utils.extract_id_from_hyperlink_formula(value)
+                    log.debug("Extracted report_spreadsheet_id: %s", report_spreadsheet_id)
                 elif field == RowName.PAYMENT_DISTRIBUTION.value:
-                    # Extract calculations ID from HYPERLINK formula or URL
-                    if UrlPattern.SPREADSHEETS_SEGMENT in value:
-                        calculations_spreadsheet_id = (
-                            value.split(UrlPattern.SPREADSHEETS_SEGMENT)[-1]
-                            .split('"')[0]
-                            .split(";")[0]
-                        )
+                    # Extract calculations ID from HYPERLINK formula using utility
+                    calculations_spreadsheet_id = utils.extract_id_from_hyperlink_formula(value)
+                    log.debug("Extracted calculations_spreadsheet_id: %s", calculations_spreadsheet_id)
 
             if not project_name:
                 raise Exception("Project name not found in project info sheet")
+
+            # If drive_folder_id not found, try to get it from the project file's parent
+            if not drive_folder_id:
+                log.warning("Drive folder ID not found in project info, trying to get from file metadata")
+                try:
+                    file_info = self.google_sheets_service.get_file(project_id)
+                    parents = file_info.get("parents", [])
+                    if parents:
+                        drive_folder_id = parents[0]
+                        log.info("Found drive folder ID from file metadata: %s", drive_folder_id)
+                except Exception as e:
+                    log.warning("Failed to get drive folder ID from file metadata: %s", str(e))
 
             # Create Project object
             project = Project(
@@ -482,6 +425,7 @@ class TimesheetProjectService:
                 calculations_spreadsheet_id=calculations_spreadsheet_id,
             )
 
+            log.debug("Created project object with folder_id: %s", drive_folder_id)
             return project
 
         except Exception as e:
@@ -645,13 +589,13 @@ class TimesheetProjectService:
         Returns:
             True if specialist exists
         """
-        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        specialist_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST.value])
         if specialist_idx is None:
             return False
 
         for i, row in enumerate(values[1:], start=1):  # Skip header
             if len(row) > specialist_idx and row[specialist_idx] == specialist_name:
-                return True
+                                return True
 
         return False
 
@@ -665,7 +609,7 @@ class TimesheetProjectService:
         Returns:
             Row index for insertion (0-based)
         """
-        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+        specialist_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST.value])
         if specialist_idx is None:
             return 1  # Insert after header
 
@@ -677,14 +621,14 @@ class TimesheetProjectService:
             if len(row) > specialist_idx and row[specialist_idx]:
                 has_specialists = True
                 last_data_row = i
-
+                
             # Check for total row (usually has formula or specific pattern)
             if i > 0 and len(row) > specialist_idx:
                 if (not row[specialist_idx] or row[specialist_idx] == "0" or 
                     (len(row) > 2 and "$" in str(row[2]) and not row[0])):
                     total_row = i
                     break
-
+            
         # Determine insert position
         if not has_specialists:
             return 1  # First specialist, use row 2
@@ -693,11 +637,11 @@ class TimesheetProjectService:
             insert_row = last_data_row + 1
         else:
             insert_row = 1
-
+                
         # Insert before total row if it exists
         if total_row is not None and insert_row >= total_row:
             insert_row = total_row
-
+                
         return insert_row
 
     def _prepare_general_expenses_row_data(self, headers: List[str], specialist: Specialist) -> List[str]:
@@ -713,8 +657,8 @@ class TimesheetProjectService:
         update_data = [""] * len(headers)
         
         # Basic specialist information
-        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
-        role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+        specialist_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST.value])
+        role_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_ROLE.value])
         
         if specialist_idx is not None:
             update_data[specialist_idx] = specialist.name
@@ -734,7 +678,7 @@ class TimesheetProjectService:
             update_data: Row data to update
             headers: Column headers
         """
-        hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
+        hours_worked_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.HOURS_WORKED.value])
         if hours_worked_idx is not None:
             try:
                 working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
@@ -754,12 +698,12 @@ class TimesheetProjectService:
             specialist: Specialist object
         """
         # Add hourly rate
-        rate_idx = self._find_column_index(headers, ColumnName.HOURLY_RATE_USD.value)
+        rate_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.HOURLY_RATE_USD.value])
         if rate_idx is not None:
             update_data[rate_idx] = str(specialist.external_rate)
 
         # Add total cost formula
-        total_cost_idx = self._find_column_index(headers, ColumnName.TOTAL_COST_USD.value)
+        total_cost_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.TOTAL_COST_USD.value])
         if total_cost_idx is not None:
             try:
                 gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
@@ -877,8 +821,8 @@ class TimesheetProjectService:
         update_data = [""] * len(headers)
         
         # Basic specialist information
-        specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
-        role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+        specialist_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST.value])
+        role_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_ROLE.value])
         
         if specialist_idx is not None:
             update_data[specialist_idx] = specialist.name
@@ -902,12 +846,12 @@ class TimesheetProjectService:
             specialist: Specialist object
         """
         # Add specialist hourly rate (internal rate)
-        specialist_rate_idx = self._find_column_index(headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
+        specialist_rate_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_HOURLY_RATE_USD.value])
         if specialist_rate_idx is not None:
             update_data[specialist_rate_idx] = str(specialist.internal_rate)
 
         # Add specialist work cost formula 
-        specialist_cost_idx = self._find_column_index(headers, ColumnName.SPECIALIST_WORK_COST_USD.value)
+        specialist_cost_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.SPECIALIST_WORK_COST_USD.value])
         if specialist_cost_idx is not None:
             try:
                 # Use net total cost formula for specialist work cost
@@ -918,12 +862,12 @@ class TimesheetProjectService:
                 log.warning("Failed to set specialist work cost formula: %s", str(e))
                 
         # Add client hourly rate (external rate)
-        client_rate_idx = self._find_column_index(headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
+        client_rate_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.CLIENT_HOURLY_RATE_USD.value])
         if client_rate_idx is not None:
             update_data[client_rate_idx] = str(specialist.external_rate)
 
         # Add client work cost formula
-        client_cost_idx = self._find_column_index(headers, ColumnName.CLIENT_WORK_COST_USD.value)
+        client_cost_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.CLIENT_WORK_COST_USD.value])
         if client_cost_idx is not None:
             try:
                 # Use gross total cost formula for client work cost
@@ -934,7 +878,7 @@ class TimesheetProjectService:
                 log.warning("Failed to set client work cost formula: %s", str(e))
                 
         # Add revenue formula
-        revenue_idx = self._find_column_index(headers, ColumnName.REVENUE_USD.value)
+        revenue_idx = self.google_sheets_service.find_column_index(headers, [ColumnName.REVENUE_USD.value])
         if revenue_idx is not None:
             try:
                 revenue_formula = config_service.get_formula(FormulaName.REVENUE)
@@ -1050,20 +994,7 @@ class TimesheetProjectService:
                 f"Failed to create specialist tab in calculations: {str(e)}"
             )
             
-    def _find_column_index(self, headers: List[str], column_name: str) -> Optional[int]:
-        """Find the index of a column by its name.
-        
-        Args:
-            headers: List of column headers
-            column_name: Name of the column to find
-            
-        Returns:
-            Index of the column or None if not found
-        """
-        for i, header in enumerate(headers):
-            if header.strip().lower() == column_name.lower():
-                return i
-        return None
+
         
     def _copy_row_formatting(self, spreadsheet_id: str, sheet_name: str, source_row: int, target_row: int) -> None:
         """Copy row formatting and formulas from one row to another.

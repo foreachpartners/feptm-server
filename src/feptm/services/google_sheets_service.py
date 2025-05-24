@@ -555,6 +555,121 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to batch update spreadsheet: {error}")
 
+    # Utility methods for Google Sheets operations
+    
+    def find_column_index(self, headers: List[str], column_names: List[str]) -> Optional[int]:
+        """Find column index by possible header names.
+
+        Args:
+            headers: List of column headers
+            column_names: List of possible names for the column
+
+        Returns:
+            Index of the column or None if not found
+        """
+        for name in column_names:
+            for i, header in enumerate(headers):
+                if header.strip().lower() == name.lower():
+                    return i
+        return None
+
+    def column_index_to_letter(self, col_idx: int) -> str:
+        """Convert column index to letter (A, B, C, etc.).
+
+        Args:
+            col_idx: Zero-based column index
+
+        Returns:
+            Column letter
+        """
+        result = ""
+        while col_idx >= 0:
+            result = chr(col_idx % 26 + ord('A')) + result
+            col_idx = col_idx // 26 - 1
+        return result
+
+    def column_letter_to_index(self, letter: str) -> int:
+        """Convert column letter to zero-based index.
+
+        Args:
+            letter: Column letter (A, B, C, etc.)
+
+        Returns:
+            Zero-based column index
+        """
+        result = 0
+        for char in letter.upper():
+            result = result * 26 + (ord(char) - ord('A') + 1)
+        return result - 1
+
+    def format_range(self, sheet_name: str, start_col: str, end_col: str, row: int) -> str:
+        """Format a range string for Google Sheets API.
+
+        Args:
+            sheet_name: Name of the sheet
+            start_col: Starting column letter
+            end_col: Ending column letter  
+            row: Row number
+
+        Returns:
+            Formatted range string
+        """
+        return f"{sheet_name}!{start_col}{row}:{end_col}{row}"
+
+    def find_specialist_row_index(self, values: List[List], name_col_idx: int, specialist_name: str) -> Optional[int]:
+        """Find row index for a specialist by name.
+
+        Args:
+            values: Sheet values
+            name_col_idx: Index of the name column
+            specialist_name: Name of the specialist to find
+
+        Returns:
+            Zero-based row index or None if not found
+        """
+        for i, row in enumerate(values[1:], start=1):  # Skip header row
+            if name_col_idx < len(row) and row[name_col_idx].strip() == specialist_name:
+                return i
+        return None
+
+    def get_sheet_data_with_headers(self, spreadsheet_id: str, sheet_name: str, range_format: str) -> tuple[List[List], List[str]]:
+        """Get sheet data along with headers.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+            range_format: Range format string (can contain {sheet_name} placeholder)
+
+        Returns:
+            Tuple of (values, headers)
+
+        Raises:
+            Exception: If sheet cannot be read
+        """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
+        # Format the range with sheet name
+        range_name = range_format.format(sheet_name=sheet_name)
+        
+        try:
+            result = (
+                self.sheets_service.spreadsheets()
+                .values()
+                .get(spreadsheetId=spreadsheet_id, range=range_name)
+                .execute()
+            )
+
+            values = result.get("values", [])
+            if not values:
+                return [], []
+
+            headers = values[0] if values else []
+            return values, headers
+
+        except HttpError as error:
+            raise Exception(f"Failed to get sheet data: {error}")
+
     def is_initialized(self) -> bool:
         """Check if the service is properly initialized.
 
