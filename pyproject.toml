@@ -37,6 +37,7 @@ run-api = "bin.run_api:main"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 pythonpath = ["src"]
+asyncio_mode = "auto"
 
 [tool.black]
 line-length = 88

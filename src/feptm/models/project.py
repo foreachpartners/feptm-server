@@ -11,7 +11,7 @@ from feptm.models.specialist import Specialist
 class Project(BaseModel):
     """Project model representing a client project."""
 
-    name: str
+    name: str = Field(..., min_length=1, description="Project name cannot be empty")
     drive_folder_id: Optional[str] = None
     project_info_spreadsheet_id: Optional[str] = None
     report_spreadsheet_id: Optional[str] = None
@@ -85,7 +85,7 @@ class ProjectMetaResponse(BaseModel):
 class ProjectSyncRequest(BaseModel):
     """Request model for syncing project specialists."""
 
-    project_id: str
+    project_id: str = Field(..., min_length=1, description="Project ID cannot be empty")
 
 
 class ProjectSyncResponse(BaseModel):

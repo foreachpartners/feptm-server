@@ -1,4 +1,4 @@
-.PHONY: lint format isort typecheck test all
+.PHONY: lint format isort typecheck test test-coverage all
 
 # Set PYTHONPATH for test and runtime commands only
 export PYTHONPATH := $(shell pwd)/src
@@ -17,6 +17,9 @@ typecheck:
 
 test:
 	uv run pytest $(ARGS)
+
+test-coverage:
+	uv run pytest --cov=feptm --cov-report=term-missing --cov-report=html $(ARGS)
 
 # Run all tools
 all: lint format isort typecheck test 
