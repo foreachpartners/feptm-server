@@ -266,11 +266,13 @@ class SpecialistService:
             # Skip empty rows
             name_idx = headers_map["name"]
             role_idx = headers_map["role"]
-            
+
             # Both name and role columns should exist due to validation, but double-check
             if name_idx is None or role_idx is None:
-                raise Exception("Required columns 'name' or 'role' not found after validation")
-            
+                raise Exception(
+                    "Required columns 'name' or 'role' not found after validation"
+                )
+
             if not row or len(row) <= max(name_idx, role_idx):
                 continue
 
