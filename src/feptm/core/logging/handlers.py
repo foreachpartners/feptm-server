@@ -12,7 +12,7 @@ from feptm.core.logging.formatters import JSONFormatter
 
 def get_console_handler() -> logging.StreamHandler:
     """Create console handler with JSON formatting.
-    
+
     Returns:
         Configured console handler
     """
@@ -27,12 +27,12 @@ def get_file_handler(
     backup_count: int = 5,
 ) -> Optional[RotatingFileHandler]:
     """Create rotating file handler with JSON formatting.
-    
+
     Args:
         log_file: Path to log file
         max_bytes: Maximum size of log file before rotation
         backup_count: Number of backup files to keep
-        
+
     Returns:
         Configured file handler or None if log_file is not set
     """

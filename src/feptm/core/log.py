@@ -48,6 +48,7 @@ setup_logging(log_file=log_file)
 # Create global logger
 log = logging.getLogger("feptm")
 
+
 # Add context manager for structured logging
 class LogContext:
     """Context manager for adding context to log messages."""

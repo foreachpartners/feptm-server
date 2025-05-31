@@ -104,7 +104,7 @@ dev = [
     "httpx>=0.28.1",
     "isort>=6.0.1",
     "mypy>=1.15.0",
-    "pytest>=8.3.5",
+    "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
 ]

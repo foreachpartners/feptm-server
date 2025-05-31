@@ -690,9 +690,9 @@ class TimesheetProjectService:
                     total_row = i
                     break
 
-        # Determine insert position
+        # For the first specialist, don't insert a new row
         if not has_specialists:
-            return 1  # First specialist, use row 2
+            return 1  # Use the first data row (row 2 in the sheet)
 
         if last_data_row is not None:
             insert_row = last_data_row + 1
@@ -794,29 +794,41 @@ class TimesheetProjectService:
     def _insert_and_update_specialist_row(
         self,
         spreadsheet_id: str,
-        sheet_name: str,
+        sheet_name: str, 
         sheet: Dict,
         insert_row: int,
         update_data: List[str],
         headers: List[str],
     ) -> None:
-        """Insert new row if needed and update with specialist data.
+        """Insert a new row and update it with specialist data.
 
         Args:
             spreadsheet_id: ID of the spreadsheet
             sheet_name: Name of the sheet
-            sheet: Sheet object
-            insert_row: Row index for insertion
-            update_data: Data to insert
+            sheet: Sheet metadata
+            insert_row: Row to insert at (0-based)
+            update_data: Data to update the row with
             headers: Column headers
-        """
-        # Insert row if needed (when there are existing specialists and total rows)
-        sheet_id = sheet.get("properties", {}).get("sheetId")
 
-        # For now, always try to insert a new row for safety
-        # This could be optimized later based on specific conditions
+        Raises:
+            Exception: If update fails
+        """
+        if sheet is None:
+            raise Exception(f"Sheet '{sheet_name}' not found")
+
+        sheet_id = sheet.get("properties", {}).get("sheetId")
+        if not sheet_id:
+            raise Exception(f"Sheet ID not found for '{sheet_name}'")
+
         try:
-            request = {
+            # Calculate column range
+            col_count = self._get_columns_count(headers)
+            
+            # Prepare source row - always use row 1 (first data row) as template
+            source_row = 1
+
+            # Prepare requests
+            insert_request = {
                 "insertDimension": {
                     "range": {
                         "sheetId": sheet_id,
@@ -824,26 +836,80 @@ class TimesheetProjectService:
                         "startIndex": insert_row,
                         "endIndex": insert_row + 1,
                     },
-                    "inheritFromBefore": True,
+                    "inheritFromBefore": False,  # Don't inherit to avoid formula issues
                 }
             }
 
+            # Prepare formula copy request
+            copy_request = {
+                "copyPaste": {
+                    "source": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": source_row,
+                        "endRowIndex": source_row + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": col_count,
+                    },
+                    "destination": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": insert_row,
+                        "endRowIndex": insert_row + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": col_count,
+                    },
+                    "pasteType": "PASTE_FORMULA",
+                    "pasteOrientation": "NORMAL",
+                }
+            }
+
+            # Prepare format copy request  
+            format_request = {
+                "copyPaste": {
+                    "source": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": source_row,
+                        "endRowIndex": source_row + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": col_count,
+                    },
+                    "destination": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": insert_row,
+                        "endRowIndex": insert_row + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": col_count,
+                    },
+                    "pasteType": "PASTE_FORMAT",
+                    "pasteOrientation": "NORMAL",
+                }
+            }
+
+            # First insert the row
             self.google_sheets_service.batch_update(
-                spreadsheet_id=spreadsheet_id, requests=[request]
+                spreadsheet_id=spreadsheet_id, 
+                requests=[insert_request]
             )
+            
+            # Then in a separate batch update copy formulas and formatting
+            self.google_sheets_service.batch_update(
+                spreadsheet_id=spreadsheet_id,
+                requests=[copy_request, format_request]
+            )
+
+            # Update the row with data
+            target_row = insert_row + 1  # Convert to 1-based indexing
+            range_name = f"{sheet_name}!A{target_row}:{self._column_letter(len(headers) - 1)}{target_row}"
+
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=range_name,
+                values=[update_data],
+                value_input_option="USER_ENTERED",
+            )
+
         except Exception as e:
-            log.warning("Failed to insert row, continuing with update: %s", str(e))
-
-        # Update the row with data
-        target_row = insert_row + 1  # Convert to 1-based indexing
-        range_name = f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}"
-
-        self.google_sheets_service.update_range(
-            spreadsheet_id=spreadsheet_id,
-            range_name=range_name,
-            values=[update_data],
-            value_input_option="USER_ENTERED",
-        )
+            log.error("Error inserting and updating specialist row: %s", str(e))
+            raise Exception(f"Failed to insert and update specialist row: {str(e)}")
 
     def _update_payment_distribution_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
@@ -1168,9 +1234,31 @@ class TimesheetProjectService:
                 }
             }
 
-            # Execute the request
+            # Also copy formatting in a separate request
+            format_request = {
+                "copyPaste": {
+                    "source": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": source_row - 1,
+                        "endRowIndex": source_row,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 100,
+                    },
+                    "destination": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": target_row - 1,
+                        "endRowIndex": target_row,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 100,
+                    },
+                    "pasteType": "PASTE_FORMAT",
+                    "pasteOrientation": "NORMAL",
+                }
+            }
+
+            # Execute both copy requests
             self.google_sheets_service.batch_update(
-                spreadsheet_id=spreadsheet_id, requests=[request]
+                spreadsheet_id=spreadsheet_id, requests=[request, format_request]
             )
 
             log.info(
@@ -1197,3 +1285,15 @@ class TimesheetProjectService:
             result = chr(index % 26 + ord("A")) + result
             index = index // 26 - 1
         return result
+
+    def _get_columns_count(self, headers: List[str]) -> int:
+        """Get the total number of columns needed based on header count.
+        
+        Args:
+            headers: List of column headers
+            
+        Returns:
+            Number of columns to cover
+        """
+        # Add some buffer columns for safety
+        return len(headers) + 5

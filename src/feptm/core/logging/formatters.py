@@ -21,10 +21,10 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as JSON.
-        
+
         Args:
             record: Log record to format
-            
+
         Returns:
             JSON string containing log data
         """

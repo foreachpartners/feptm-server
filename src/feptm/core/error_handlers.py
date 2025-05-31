@@ -11,22 +11,22 @@ from feptm.core.log import log
 
 def add_error_handlers(app: FastAPI) -> None:
     """Register error handlers for the application.
-    
+
     Args:
         app: FastAPI application instance
     """
-    
+
     @app.exception_handler(FEPTMError)
     async def feptm_error_handler(
         request: Request,
         exc: FEPTMError,
     ) -> JSONResponse:
         """Handle all application-specific errors.
-        
+
         Args:
             request: FastAPI request
             exc: Raised exception
-            
+
         Returns:
             JSON response with error details
         """
@@ -40,7 +40,7 @@ def add_error_handlers(app: FastAPI) -> None:
                 "error_details": exc.details,
             },
         )
-        
+
         return JSONResponse(
             status_code=500,
             content={
@@ -58,11 +58,11 @@ def add_error_handlers(app: FastAPI) -> None:
         exc: Exception,
     ) -> JSONResponse:
         """Handle unexpected errors.
-        
+
         Args:
             request: FastAPI request
             exc: Raised exception
-            
+
         Returns:
             JSON response with error details
         """
@@ -73,7 +73,7 @@ def add_error_handlers(app: FastAPI) -> None:
                 "method": request.method,
             },
         )
-        
+
         return JSONResponse(
             status_code=500,
             content={
