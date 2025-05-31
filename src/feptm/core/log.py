@@ -1,41 +1,40 @@
 """Logging configuration for the application."""
 
 import logging
-import sys
-from typing import Optional
+from pathlib import Path
+from typing import Optional, List
 
 from feptm.core.config import settings
-
-# Define log format
-DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-DEFAULT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+from feptm.core.logging.handlers import get_console_handler, get_file_handler
 
 
 def setup_logging(
     level: Optional[int] = None,
-    format_str: str = DEFAULT_FORMAT,
-    date_format: str = DEFAULT_DATE_FORMAT,
+    log_file: Optional[Path] = None,
 ) -> None:
-    """
-    Setup basic logging configuration.
+    """Setup logging configuration with structured output and rotation.
 
     Args:
         level: Logging level (defaults to DEBUG in dev mode, INFO in production)
-        format_str: Log message format
-        date_format: Date format for log messages
+        log_file: Path to log file (optional)
     """
     if level is None:
         level = logging.DEBUG if settings.DEBUG else logging.INFO
 
-    # Configure basic logging with console handler
+    # Get handlers
+    handlers: List[logging.Handler] = [get_console_handler()]
+    if log_file:
+        file_handler = get_file_handler(log_file)
+        if file_handler:
+            handlers.append(file_handler)
+
+    # Configure root logger
     logging.basicConfig(
         level=level,
-        format=format_str,
-        datefmt=date_format,
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=handlers,
     )
 
-    # Set level for external libraries
+    # Configure external loggers
     for logger_name in ["uvicorn", "uvicorn.error", "fastapi"]:
         ext_logger = logging.getLogger(logger_name)
         ext_logger.handlers = []
@@ -43,7 +42,33 @@ def setup_logging(
 
 
 # Initialize logging with default settings
-setup_logging()
+log_file = settings.BASE_DIR / "logs" / "feptm.log" if not settings.DEBUG else None
+setup_logging(log_file=log_file)
 
-# Create global logger to be used across the application
+# Create global logger
 log = logging.getLogger("feptm")
+
+# Add context manager for structured logging
+class LogContext:
+    """Context manager for adding context to log messages."""
+
+    def __init__(self, **kwargs) -> None:
+        self.extra = kwargs
+        self._old_factory = None
+
+    def __enter__(self) -> None:
+        if self.extra:
+            old_factory = logging.getLogRecordFactory()
+
+            def record_factory(*args, **kwargs):
+                record = old_factory(*args, **kwargs)
+                record.extra = getattr(record, "extra", {})
+                record.extra.update(self.extra)
+                return record
+
+            self._old_factory = old_factory
+            logging.setLogRecordFactory(record_factory)
+
+    def __exit__(self, *args) -> None:
+        if self._old_factory:
+            logging.setLogRecordFactory(self._old_factory)

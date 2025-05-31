@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from feptm.api.router import router as api_router
 from feptm.core.config import settings
+from feptm.core.error_handlers import add_error_handlers
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -13,6 +14,10 @@ app = FastAPI(
     version=settings.VERSION,
 )
 
+# Register error handlers
+add_error_handlers(app)
+
+# Register API routes
 app.include_router(api_router, prefix="/api")
 
 

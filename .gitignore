@@ -1,4 +1,5 @@
 /.cursor/rules
+/.github/instructions
 /.venv
 /credentials.json
 /.google_sheets_token.json
