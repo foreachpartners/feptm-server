@@ -567,13 +567,12 @@ class TimesheetProjectService:
                 )
                 return
 
-            # Find insert position and prepare data
-            insert_row = self._find_insert_position_for_specialist(values, headers)
-            update_data = self._prepare_general_expenses_row_data(headers, specialist)
+            # Find insert position
+            insert_row, should_insert = self._find_insert_position_for_specialist(values, headers)
 
             # Insert row if needed and update data
             self._insert_and_update_specialist_row(
-                spreadsheet_id, sheet_name, sheet, insert_row, update_data, headers
+                spreadsheet_id, sheet_name, sheet, insert_row, should_insert, specialist, headers, values
             )
 
             log.info("Added %s to %s tab", specialist.name, sheet_name)
@@ -655,7 +654,7 @@ class TimesheetProjectService:
 
     def _find_insert_position_for_specialist(
         self, values: List[List], headers: List[str]
-    ) -> int:
+    ) -> Tuple[int, bool]:
         """Find the position where to insert a new specialist.
 
         Args:
@@ -663,13 +662,13 @@ class TimesheetProjectService:
             headers: Header row
 
         Returns:
-            Row index for insertion (0-based)
+            Tuple of (row index for insertion (0-based), should_insert_new_row)
         """
         specialist_idx = self.google_sheets_service.find_column_index(
             headers, [ColumnName.SPECIALIST.value]
         )
         if specialist_idx is None:
-            return 1  # Insert after header
+            return 1, False  # Use row 2, don't insert new row
 
         last_data_row = None
         total_row = None
@@ -692,8 +691,13 @@ class TimesheetProjectService:
 
         # Determine insert position
         if not has_specialists:
-            return 1  # First specialist, use row 2
+            # First specialist - check if there's an empty row after header
+            if len(values) > 1 and (len(values[1]) == 0 or not any(values[1])):
+                return 1, False  # Use existing empty row 2, don't insert
+            else:
+                return 1, True  # Insert new row after header
 
+        # For subsequent specialists, always insert new row
         if last_data_row is not None:
             insert_row = last_data_row + 1
         else:
@@ -703,50 +707,110 @@ class TimesheetProjectService:
         if total_row is not None and insert_row >= total_row:
             insert_row = total_row
 
-        return insert_row
+        return insert_row, True
 
-    def _prepare_general_expenses_row_data(
-        self, headers: List[str], specialist: Specialist
-    ) -> List[str]:
-        """Prepare row data for General Expenses sheet.
-
-        Args:
-            headers: Column headers
-            specialist: Specialist object
-
-        Returns:
-            List of values for the row
-        """
-        update_data = [""] * len(headers)
-
-        # Basic specialist information
-        specialist_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST.value]
-        )
-        role_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST_ROLE.value]
-        )
-
-        if specialist_idx is not None:
-            update_data[specialist_idx] = specialist.name
-        if role_idx is not None:
-            update_data[role_idx] = specialist.role
-
-        # Add formulas and rates
-        self._add_working_hours_formula(update_data, headers)
-        self._add_general_expenses_formulas(update_data, headers, specialist)
-
-        return update_data
-
-    def _add_working_hours_formula(
-        self, update_data: List[str], headers: List[str]
+    def _insert_and_update_specialist_row(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+        sheet: Dict,
+        insert_row: int,
+        should_insert: bool,
+        specialist: Specialist,
+        headers: List[str],
+        values: List[List],
     ) -> None:
-        """Add working hours formula to row data.
+        """Insert new row if needed and update with specialist data using template copying.
 
         Args:
-            update_data: Row data to update
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+            sheet: Sheet object
+            insert_row: Row index for insertion
+            should_insert: Whether to insert a new row
+            specialist: Specialist object with data
+            headers: Column headers
+            values: Current sheet values for template detection
+        """
+        sheet_id = sheet.get("properties", {}).get("sheetId")
+        target_row = insert_row + 1  # Convert to 1-based indexing
+
+        # Insert row if needed
+        if should_insert:
+            try:
+                request = {
+                    "insertDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": insert_row,
+                            "endIndex": insert_row + 1,
+                        },
+                        "inheritFromBefore": True,
+                    }
+                }
+
+                self.google_sheets_service.batch_update(
+                    spreadsheet_id=spreadsheet_id, requests=[request]
+                )
+                log.debug("Inserted new row at position %d", insert_row)
+            except Exception as e:
+                log.warning("Failed to insert row, continuing with update: %s", str(e))
+
+        # Find template row to copy formatting and formulas from
+        template_row = self._find_template_row_for_specialist(values, headers)
+        
+        if template_row:
+            try:
+                # Copy formatting and formulas from template row
+                self._copy_row_formatting(
+                    spreadsheet_id=spreadsheet_id,
+                    sheet_name=sheet_name,
+                    source_row=template_row,
+                    target_row=target_row,
+                    paste_type="PASTE_NORMAL"  # Copy everything: formulas, formatting, etc.
+                )
+                log.debug("Copied template from row %d to row %d", template_row, target_row)
+            except Exception as e:
+                log.warning("Failed to copy template formatting: %s", str(e))
+        else:
+            # No template row found (first specialist) - add formulas from config
+            try:
+                self._add_formulas_from_config(
+                    spreadsheet_id=spreadsheet_id,
+                    sheet_name=sheet_name,
+                    target_row=target_row,
+                    headers=headers,
+                )
+                log.debug("Added formulas from config for first specialist")
+            except Exception as e:
+                log.warning("Failed to add formulas from config: %s", str(e))
+
+        # Update specialist-specific data (name, role, rates)
+        self._update_specialist_data_in_row(
+            spreadsheet_id=spreadsheet_id,
+            sheet_name=sheet_name,
+            target_row=target_row,
+            specialist=specialist,
+            headers=headers,
+        )
+
+    def _add_formulas_from_config(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+        target_row: int,
+        headers: List[str],
+    ) -> None:
+        """Add formulas from configuration for the first specialist.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+            target_row: Target row to update (1-based)
             headers: Column headers
         """
+        # Add working hours formula
         hours_worked_idx = self.google_sheets_service.find_column_index(
             headers, [ColumnName.HOURS_WORKED.value]
         )
@@ -755,29 +819,18 @@ class TimesheetProjectService:
                 working_hours_formula = config_service.get_formula(
                     FormulaName.CALCULATE_WORKING_HOURS
                 )
-                update_data[hours_worked_idx] = working_hours_formula
-                log.debug("Added working hours formula")
+                range_name = f"{sheet_name}!{self._column_letter(hours_worked_idx)}{target_row}"
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=[[working_hours_formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                log.debug("Added working hours formula to row %d", target_row)
             except Exception as e:
                 log.warning("Failed to set hours calculation formula: %s", str(e))
 
-    def _add_general_expenses_formulas(
-        self, update_data: List[str], headers: List[str], specialist: Specialist
-    ) -> None:
-        """Add General Expenses specific formulas and rates.
-
-        Args:
-            update_data: Row data to update
-            headers: Column headers
-            specialist: Specialist object
-        """
-        # Add hourly rate
-        rate_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.HOURLY_RATE_USD.value]
-        )
-        if rate_idx is not None:
-            update_data[rate_idx] = str(specialist.external_rate)
-
-        # Add total cost formula
+        # Add total cost formula for General Expenses sheet
         total_cost_idx = self.google_sheets_service.find_column_index(
             headers, [ColumnName.TOTAL_COST_USD.value]
         )
@@ -786,64 +839,148 @@ class TimesheetProjectService:
                 gross_total_cost_formula = config_service.get_formula(
                     FormulaName.GROSS_TOTAL_COST
                 )
-                update_data[total_cost_idx] = gross_total_cost_formula
-                log.debug("Added total cost formula")
+                range_name = f"{sheet_name}!{self._column_letter(total_cost_idx)}{target_row}"
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=[[gross_total_cost_formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                log.debug("Added total cost formula to row %d", target_row)
             except Exception as e:
                 log.warning("Failed to set total cost formula: %s", str(e))
 
-    def _insert_and_update_specialist_row(
+        # Add specialist work cost formula for Payment Distribution sheet
+        specialist_cost_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.SPECIALIST_WORK_COST_USD.value]
+        )
+        if specialist_cost_idx is not None:
+            try:
+                specialist_cost_formula = config_service.get_formula(
+                    FormulaName.NET_TOTAL_COST
+                )
+                range_name = f"{sheet_name}!{self._column_letter(specialist_cost_idx)}{target_row}"
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=[[specialist_cost_formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                log.debug("Added specialist work cost formula to row %d", target_row)
+            except Exception as e:
+                log.warning("Failed to set specialist work cost formula: %s", str(e))
+
+        # Add client work cost formula for Payment Distribution sheet
+        client_cost_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.CLIENT_WORK_COST_USD.value]
+        )
+        if client_cost_idx is not None:
+            try:
+                client_cost_formula = config_service.get_formula(
+                    FormulaName.GROSS_TOTAL_COST
+                )
+                range_name = f"{sheet_name}!{self._column_letter(client_cost_idx)}{target_row}"
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=[[client_cost_formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                log.debug("Added client work cost formula to row %d", target_row)
+            except Exception as e:
+                log.warning("Failed to set client work cost formula: %s", str(e))
+
+        # Add revenue formula for Payment Distribution sheet
+        revenue_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.REVENUE_USD.value]
+        )
+        if revenue_idx is not None:
+            try:
+                revenue_formula = config_service.get_formula(FormulaName.REVENUE)
+                range_name = f"{sheet_name}!{self._column_letter(revenue_idx)}{target_row}"
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=[[revenue_formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                log.debug("Added revenue formula to row %d", target_row)
+            except Exception as e:
+                log.warning("Failed to set revenue formula: %s", str(e))
+
+    def _update_specialist_data_in_row(
         self,
         spreadsheet_id: str,
         sheet_name: str,
-        sheet: Dict,
-        insert_row: int,
-        update_data: List[str],
+        target_row: int,
+        specialist: Specialist,
         headers: List[str],
     ) -> None:
-        """Insert new row if needed and update with specialist data.
+        """Update specialist-specific data in a row (name, role, rates).
 
         Args:
             spreadsheet_id: ID of the spreadsheet
             sheet_name: Name of the sheet
-            sheet: Sheet object
-            insert_row: Row index for insertion
-            update_data: Data to insert
+            target_row: Target row to update (1-based)
+            specialist: Specialist object with data
             headers: Column headers
         """
-        # Insert row if needed (when there are existing specialists and total rows)
-        sheet_id = sheet.get("properties", {}).get("sheetId")
-
-        # For now, always try to insert a new row for safety
-        # This could be optimized later based on specific conditions
-        try:
-            request = {
-                "insertDimension": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "dimension": "ROWS",
-                        "startIndex": insert_row,
-                        "endIndex": insert_row + 1,
-                    },
-                    "inheritFromBefore": True,
-                }
-            }
-
-            self.google_sheets_service.batch_update(
-                spreadsheet_id=spreadsheet_id, requests=[request]
-            )
-        except Exception as e:
-            log.warning("Failed to insert row, continuing with update: %s", str(e))
-
-        # Update the row with data
-        target_row = insert_row + 1  # Convert to 1-based indexing
-        range_name = f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}"
-
-        self.google_sheets_service.update_range(
-            spreadsheet_id=spreadsheet_id,
-            range_name=range_name,
-            values=[update_data],
-            value_input_option="USER_ENTERED",
+        # Prepare updates for specialist-specific fields only
+        updates = []
+        
+        # Update specialist name
+        specialist_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.SPECIALIST.value]
         )
+        if specialist_idx is not None:
+            range_name = f"{sheet_name}!{self._column_letter(specialist_idx)}{target_row}"
+            updates.append((range_name, [[specialist.name]]))
+
+        # Update specialist role
+        role_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.SPECIALIST_ROLE.value]
+        )
+        if role_idx is not None:
+            range_name = f"{sheet_name}!{self._column_letter(role_idx)}{target_row}"
+            updates.append((range_name, [[specialist.role]]))
+
+        # Update hourly rate (external rate for general expenses)
+        rate_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.HOURLY_RATE_USD.value]
+        )
+        if rate_idx is not None:
+            range_name = f"{sheet_name}!{self._column_letter(rate_idx)}{target_row}"
+            updates.append((range_name, [[str(specialist.external_rate)]]))
+
+        # For payment distribution sheet, also update internal rates
+        internal_rate_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.SPECIALIST_HOURLY_RATE_USD.value]
+        )
+        if internal_rate_idx is not None:
+            range_name = f"{sheet_name}!{self._column_letter(internal_rate_idx)}{target_row}"
+            updates.append((range_name, [[str(specialist.internal_rate)]]))
+
+        # For payment distribution sheet, also update client rate
+        client_rate_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.CLIENT_HOURLY_RATE_USD.value]
+        )
+        if client_rate_idx is not None:
+            range_name = f"{sheet_name}!{self._column_letter(client_rate_idx)}{target_row}"
+            updates.append((range_name, [[str(specialist.external_rate)]]))
+
+        # Apply all updates
+        for range_name, values in updates:
+            try:
+                self.google_sheets_service.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=range_name,
+                    values=values,
+                    value_input_option="USER_ENTERED",
+                )
+            except Exception as e:
+                log.warning("Failed to update %s: %s", range_name, str(e))
+
+        log.debug("Updated specialist data for %s in row %d", specialist.name, target_row)
 
     def _update_payment_distribution_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
@@ -875,15 +1012,12 @@ class TimesheetProjectService:
                 )
                 return
 
-            # Find insert position and prepare data
-            insert_row = self._find_insert_position_for_specialist(values, headers)
-            update_data = self._prepare_payment_distribution_row_data(
-                headers, specialist
-            )
+            # Find insert position
+            insert_row, should_insert = self._find_insert_position_for_specialist(values, headers)
 
             # Insert row if needed and update data
             self._insert_and_update_specialist_row(
-                spreadsheet_id, sheet_name, sheet, insert_row, update_data, headers
+                spreadsheet_id, sheet_name, sheet, insert_row, should_insert, specialist, headers, values
             )
 
             log.info("Added %s to %s tab", specialist.name, sheet_name)
@@ -895,105 +1029,6 @@ class TimesheetProjectService:
             raise Exception(
                 f"Failed to update Payment Distribution Current Period tab: {str(e)}"
             )
-
-    def _prepare_payment_distribution_row_data(
-        self, headers: List[str], specialist: Specialist
-    ) -> List[str]:
-        """Prepare row data for Payment Distribution sheet.
-
-        Args:
-            headers: Column headers
-            specialist: Specialist object
-
-        Returns:
-            List of values for the row
-        """
-        update_data = [""] * len(headers)
-
-        # Basic specialist information
-        specialist_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST.value]
-        )
-        role_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST_ROLE.value]
-        )
-
-        if specialist_idx is not None:
-            update_data[specialist_idx] = specialist.name
-        if role_idx is not None:
-            update_data[role_idx] = specialist.role
-
-        # Add formulas and rates specific to payment distribution
-        self._add_working_hours_formula(update_data, headers)
-        self._add_payment_distribution_formulas(update_data, headers, specialist)
-
-        return update_data
-
-    def _add_payment_distribution_formulas(
-        self, update_data: List[str], headers: List[str], specialist: Specialist
-    ) -> None:
-        """Add Payment Distribution specific formulas and rates.
-
-        Args:
-            update_data: Row data to update
-            headers: Column headers
-            specialist: Specialist object
-        """
-        # Add specialist hourly rate (internal rate)
-        specialist_rate_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST_HOURLY_RATE_USD.value]
-        )
-        if specialist_rate_idx is not None:
-            update_data[specialist_rate_idx] = str(specialist.internal_rate)
-
-        # Add specialist work cost formula
-        specialist_cost_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.SPECIALIST_WORK_COST_USD.value]
-        )
-        if specialist_cost_idx is not None:
-            try:
-                # Use net total cost formula for specialist work cost
-                specialist_cost_formula = config_service.get_formula(
-                    FormulaName.NET_TOTAL_COST
-                )
-                update_data[specialist_cost_idx] = specialist_cost_formula
-                log.debug("Added specialist work cost formula")
-            except Exception as e:
-                log.warning("Failed to set specialist work cost formula: %s", str(e))
-
-        # Add client hourly rate (external rate)
-        client_rate_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.CLIENT_HOURLY_RATE_USD.value]
-        )
-        if client_rate_idx is not None:
-            update_data[client_rate_idx] = str(specialist.external_rate)
-
-        # Add client work cost formula
-        client_cost_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.CLIENT_WORK_COST_USD.value]
-        )
-        if client_cost_idx is not None:
-            try:
-                # Use gross total cost formula for client work cost
-                client_cost_formula = config_service.get_formula(
-                    FormulaName.GROSS_TOTAL_COST
-                )
-                update_data[client_cost_idx] = client_cost_formula
-                log.debug("Added client work cost formula")
-            except Exception as e:
-                log.warning("Failed to set client work cost formula: %s", str(e))
-
-        # Add revenue formula
-        revenue_idx = self.google_sheets_service.find_column_index(
-            headers, [ColumnName.REVENUE_USD.value]
-        )
-        if revenue_idx is not None:
-            try:
-                revenue_formula = config_service.get_formula(FormulaName.REVENUE)
-                update_data[revenue_idx] = revenue_formula
-                log.debug("Added revenue formula")
-            except Exception as e:
-                log.warning("Failed to set revenue formula: %s", str(e))
 
     def _get_spreadsheet_sheets(self, spreadsheet_id: str) -> List[str]:
         """Get list of sheet names in a spreadsheet.
@@ -1113,7 +1148,12 @@ class TimesheetProjectService:
             )
 
     def _copy_row_formatting(
-        self, spreadsheet_id: str, sheet_name: str, source_row: int, target_row: int
+        self, 
+        spreadsheet_id: str, 
+        sheet_name: str, 
+        source_row: int, 
+        target_row: int,
+        paste_type: str = "PASTE_NORMAL"
     ) -> None:
         """Copy row formatting and formulas from one row to another.
 
@@ -1122,6 +1162,7 @@ class TimesheetProjectService:
             sheet_name: Name of the sheet
             source_row: Source row to copy from (1-based)
             target_row: Target row to copy to (1-based)
+            paste_type: Type of paste operation (PASTE_NORMAL, PASTE_FORMULA, PASTE_FORMAT)
 
         Raises:
             Exception: If copying fails
@@ -1163,7 +1204,7 @@ class TimesheetProjectService:
                         "startColumnIndex": 0,
                         "endColumnIndex": 100,  # Large enough number to cover all columns
                     },
-                    "pasteType": "PASTE_FORMULA",
+                    "pasteType": paste_type,
                     "pasteOrientation": "NORMAL",
                 }
             }
@@ -1174,14 +1215,44 @@ class TimesheetProjectService:
             )
 
             log.info(
-                "Successfully copied formatting from row %d to row %d",
+                "Successfully copied row %d to row %d with paste type %s",
                 source_row,
                 target_row,
+                paste_type,
             )
 
         except Exception as e:
             log.error("Error copying row formatting: %s", str(e))
             raise Exception(f"Failed to copy row formatting: {str(e)}")
+
+    def _find_template_row_for_specialist(
+        self, values: List[List], headers: List[str]
+    ) -> Optional[int]:
+        """Find a template row to copy formatting and formulas from.
+
+        Args:
+            values: Sheet values
+            headers: Header row
+
+        Returns:
+            Row index (1-based) of template row or None if not found
+        """
+        specialist_idx = self.google_sheets_service.find_column_index(
+            headers, [ColumnName.SPECIALIST.value]
+        )
+        if specialist_idx is None:
+            return None
+
+        # Look for the last row with specialist data (not total/summary rows)
+        for i in range(len(values) - 1, 0, -1):  # Start from end, skip header
+            row = values[i]
+            if (len(row) > specialist_idx and 
+                row[specialist_idx] and 
+                row[specialist_idx] != "0" and
+                not (len(row) > 2 and "$" in str(row[2]) and not row[0])):  # Skip total rows
+                return i + 1  # Convert to 1-based indexing
+        
+        return None
 
     def _column_letter(self, index: int) -> str:
         """Convert column index to letter (A, B, C, etc.).
