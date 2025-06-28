@@ -706,7 +706,7 @@ class TimesheetProjectService:
         else:
             # Adding subsequent specialist - insert after the last specialist
             last_specialist_row = max(specialist_rows)
-            insert_position = last_specialist_row  # Insert after last specialist (0-based)
+            insert_position = last_specialist_row + 1  # Insert AFTER last specialist (0-based)
             
             # If there's a total row, make sure we insert before it
             if total_row_idx and insert_position >= total_row_idx:
