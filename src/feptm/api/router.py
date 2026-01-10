@@ -2,10 +2,12 @@
 
 from fastapi import APIRouter
 
-from feptm.api.v1 import projects
+from feptm.interfaces.api.v1 import periods, projects, specialists
 
 # Create API router
 router = APIRouter()
 
-# Include router for projects
-router.include_router(projects.router, prefix="/projects", tags=["projects"])
+# Include v1 routers
+router.include_router(projects.router, prefix="/v1")
+router.include_router(specialists.router, prefix="/v1")
+router.include_router(periods.router, prefix="/v1")

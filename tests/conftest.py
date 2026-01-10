@@ -2,14 +2,14 @@
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-# Add the backend/src directory to the Python path
+# Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath("src"))
 
 from feptm.api.router import router
@@ -19,155 +19,129 @@ test_app = FastAPI()
 test_app.include_router(router, prefix="/api")
 
 
-# Standard test data for Google Sheets API responses
-SAMPLE_SPREADSHEET_METADATA = {
-    "spreadsheetId": "test-spreadsheet-id-123",
-    "properties": {"title": "Test Spreadsheet"},
-    "sheets": [
-        {
-            "properties": {"title": "Sheet1", "sheetId": 0},
-            "data": [{"rowData": []}]
-        },
-        {
-            "properties": {"title": "Project info", "sheetId": 1},
-            "data": [{"rowData": []}]
-        }
-    ]
-}
-
-SAMPLE_SHEETS_VALUES = [
-    ["Name", "Hours", "Rate"],
-    ["John Doe", "40", "100"],
-    ["Jane Smith", "35", "120"]
-]
-
-SAMPLE_DRIVE_FILE = {
-    "id": "test-file-id-456",
-    "name": "Test File",
-    "mimeType": "application/vnd.google-apps.spreadsheet",
-    "parents": ["test-parent-folder-id"]
-}
-
-SAMPLE_DRIVE_FOLDER = {
-    "id": "test-folder-id-789",
-    "name": "Test Folder",
-    "mimeType": "application/vnd.google-apps.folder"
-}
-
-
 @pytest.fixture
 def client() -> TestClient:
     """Create a test client for FastAPI application.
-    
+
     Returns:
-        TestClient: A FastAPI test client for async endpoint testing.
+        TestClient: A FastAPI test client for testing endpoints.
     """
     return TestClient(test_app)
 
 
 @pytest.fixture
-def mock_google_api_build():
-    """Mock googleapiclient.discovery.build for comprehensive Google API testing.
-    
+def mock_pygsheets_client() -> MagicMock:
+    """Mock pygsheets client for testing.
+
     Returns:
-        Dict containing mocked sheets and drive services.
+        MagicMock: Configured pygsheets client mock.
     """
-    with patch('googleapiclient.discovery.build') as mock_build:
-        mock_sheets = MagicMock()
-        mock_drive = MagicMock()
-        
-        def build_side_effect(service: str, version: str, credentials: Any, **kwargs: Any) -> MagicMock:
-            return mock_sheets if service == "sheets" else mock_drive
-            
-        mock_build.side_effect = build_side_effect
-        
-        yield {
-            'sheets': mock_sheets,
-            'drive': mock_drive,
-            'build': mock_build
-        }
+    mock_gc = MagicMock()
+    mock_spreadsheet = MagicMock()
+    mock_worksheet = MagicMock()
+
+    # Configure mock spreadsheet
+    mock_spreadsheet.id = "test-spreadsheet-id"
+    mock_spreadsheet.worksheet_by_title.return_value = mock_worksheet
+    mock_spreadsheet.add_worksheet.return_value = mock_worksheet
+
+    # Configure mock worksheet
+    mock_worksheet.get_values.return_value = []
+    mock_worksheet.update_values.return_value = None
+    mock_worksheet.update_value.return_value = None
+    mock_worksheet.cell.return_value = MagicMock(formula="", value="")
+
+    # Configure mock client
+    mock_gc.open_by_key.return_value = mock_spreadsheet
+    mock_gc.create.return_value = mock_spreadsheet
+    mock_gc.copy.return_value = mock_spreadsheet
+    mock_gc.drive = MagicMock()
+
+    return mock_gc
 
 
 @pytest.fixture
-def mock_google_sheets_service():
-    """Standard Google Sheets service mock for business logic testing.
-    
+def mock_pygsheets_client_wrapper(mock_pygsheets_client: MagicMock) -> MagicMock:
+    """Mock PygSheetsClient wrapper.
+
+    Args:
+        mock_pygsheets_client: Mock pygsheets client
+
     Returns:
-        MagicMock: Configured GoogleSheetsService mock instance.
+        MagicMock: Configured PygSheetsClient mock
     """
-    with patch('feptm.services.google_sheets_service.GoogleSheetsService') as mock_class:
-        mock_instance = MagicMock()
-        mock_class.return_value = mock_instance
-        
-        # Set up common return values
-        mock_instance.is_initialized.return_value = True
-        mock_instance.create_spreadsheet.return_value = {
-            "spreadsheet_id": "new-spreadsheet-id",
-            "spreadsheet_url": "https://docs.google.com/spreadsheets/d/new-spreadsheet-id"
-        }
-        mock_instance.create_drive_folder.return_value = {
-            "folder_id": "new-folder-id",
-            "folder_url": "https://drive.google.com/drive/folders/new-folder-id"
-        }
-        
-        yield mock_instance
+    with patch("feptm.adapters.google.auth.authorize_pygsheets") as mock_auth:
+        mock_auth.return_value = mock_pygsheets_client
+        yield mock_pygsheets_client
 
 
 @pytest.fixture
-def mock_google_credentials():
-    """Mock Google OAuth credentials for authentication testing.
-    
+def mock_project_repository() -> MagicMock:
+    """Mock ProjectRepository for testing.
+
     Returns:
-        MagicMock: Configured credentials mock.
+        MagicMock: Configured ProjectRepository mock.
     """
-    with patch('google.oauth2.credentials.Credentials') as mock_creds_class:
-        credentials = MagicMock()
-        credentials.valid = True
-        credentials.expired = False
-        credentials.refresh_token = "test-refresh-token"
-        
-        mock_creds_class.from_authorized_user_info.return_value = credentials
-        
-        yield {
-            'Credentials': mock_creds_class,
-            'instance': credentials
-        }
+    mock_repo = MagicMock()
+    mock_repo.create.return_value = "test-project-id"
+    mock_repo.get_by_id.return_value = MagicMock(
+        name="Test Project",
+        created=MagicMock(),
+        team=[],
+    )
+    mock_repo.save.return_value = None
+    return mock_repo
+
+
+@pytest.fixture
+def mock_specialist_repository() -> MagicMock:
+    """Mock SpecialistRepository for testing.
+
+    Returns:
+        MagicMock: Configured SpecialistRepository mock.
+    """
+    mock_repo = MagicMock()
+    mock_repo.create_timesheet.return_value = "test-timesheet-id"
+    mock_repo.get_by_project.return_value = []
+    mock_repo.update_team_sheet.return_value = None
+    return mock_repo
 
 
 @pytest.fixture
 def sample_project_data() -> Dict[str, Any]:
-    """Sample project data for testing project creation workflows.
-    
+    """Sample project data for testing.
+
     Returns:
         Dict: Sample project with all required fields.
     """
     return {
         "name": "Test Project",
-        "drive_folder_id": "test-folder-123",
-        "project_info_spreadsheet_id": "test-info-456",
-        "report_spreadsheet_id": "test-report-789",
-        "calculations_spreadsheet_id": "test-calc-012"
+        "project_id": "test-project-id-123",
     }
 
 
 @pytest.fixture
 def sample_specialist_data() -> List[Dict[str, Any]]:
-    """Sample specialist data for testing specialist workflows.
-    
+    """Sample specialist data for testing.
+
     Returns:
         List: Sample specialists with required fields.
     """
     return [
         {
             "name": "John Doe",
-            "rate": "100",
-            "hours": "40",
-            "timesheet_id": "timesheet-john-123"
+            "role": "Developer",
+            "internal_rate": "12",
+            "external_rate": "14",
+            "start_date": "2025-01-01",
+            "timesheet_id": "timesheet-john-123",
         },
         {
-            "name": "Jane Smith", 
-            "rate": "120",
-            "hours": "35",
-            "timesheet_id": "timesheet-jane-456"
-        }
+            "name": "Jane Smith",
+            "role": "QA",
+            "internal_rate": "15",
+            "external_rate": "20",
+            "start_date": "2025-01-01",
+            "timesheet_id": "timesheet-jane-456",
+        },
     ]
