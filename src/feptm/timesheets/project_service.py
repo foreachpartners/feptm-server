@@ -568,11 +568,20 @@ class TimesheetProjectService:
                 return
 
             # Find insert position
-            insert_row, should_insert = self._find_insert_position_for_specialist(values, headers)
+            insert_row, should_insert = self._find_insert_position_for_specialist(
+                values, headers
+            )
 
             # Insert row if needed and update data
             self._insert_and_update_specialist_row(
-                spreadsheet_id, sheet_name, sheet, insert_row, should_insert, specialist, headers, values
+                spreadsheet_id,
+                sheet_name,
+                sheet,
+                insert_row,
+                should_insert,
+                specialist,
+                headers,
+                values,
             )
 
             log.info("Added %s to %s tab", specialist.name, sheet_name)
@@ -668,46 +677,102 @@ class TimesheetProjectService:
             headers, [ColumnName.SPECIALIST.value]
         )
         if specialist_idx is None:
+            log.warning("Specialist column not found, using default position")
             return 1, False  # Use row 2, don't insert new row
 
-        last_data_row = None
-        total_row = None
-        has_specialists = False
+        log.debug("Found specialist column at index %d", specialist_idx)
+        log.debug("Total rows in sheet: %d", len(values))
 
-        for i, row in enumerate(values[1:], start=1):  # Skip header
-            if len(row) > specialist_idx and row[specialist_idx]:
-                has_specialists = True
-                last_data_row = i
+        # Find all rows with actual specialist data and total rows
+        specialist_rows = []
+        total_row_idx = None
+        
+        for i, row in enumerate(values[1:], start=1):  # Skip header, 1-based indexing
+            if len(row) > specialist_idx:
+                if row[specialist_idx] and row[specialist_idx] != "0" and not self._is_total_row(row, headers, specialist_idx):
+                    specialist_rows.append(i)
+                    log.debug("Found specialist in row %d: %s", i + 1, row[specialist_idx])
+                elif self._is_total_row(row, headers, specialist_idx):
+                    total_row_idx = i
+                    log.debug("Found total row at %d", i + 1)
+                    break  # Stop at first total row
 
-            # Check for total row (usually has formula or specific pattern)
-            if i > 0 and len(row) > specialist_idx:
-                if (
-                    not row[specialist_idx]
-                    or row[specialist_idx] == "0"
-                    or (len(row) > 2 and "$" in str(row[2]) and not row[0])
-                ):
-                    total_row = i
-                    break
-
-        # Determine insert position
-        if not has_specialists:
-            # First specialist - check if there's an empty row after header
-            if len(values) > 1 and (len(values[1]) == 0 or not any(values[1])):
-                return 1, False  # Use existing empty row 2, don't insert
-            else:
-                return 1, True  # Insert new row after header
-
-        # For subsequent specialists, always insert new row
-        if last_data_row is not None:
-            insert_row = last_data_row + 1
+        # Determine insertion logic
+        if not specialist_rows:
+            # No specialists yet - this is the first specialist
+            log.debug("No existing specialists found - using existing row 2 for first specialist (no insertion)")
+            return 1, False
+        
         else:
-            insert_row = 1
+            # Adding subsequent specialist - insert after the last specialist
+            last_specialist_row = max(specialist_rows)
+            insert_position = last_specialist_row + 1  # Insert AFTER last specialist (0-based)
+            
+            # If there's a total row, make sure we insert before it
+            if total_row_idx and insert_position >= total_row_idx:
+                insert_position = total_row_idx
+                log.debug("Inserting before total row at position %d", insert_position + 1)
+            else:
+                log.debug("Inserting after last specialist at position %d", insert_position + 1)
+            
+            return insert_position, True  # Always insert new row for additional specialists
 
-        # Insert before total row if it exists
-        if total_row is not None and insert_row >= total_row:
-            insert_row = total_row
+    def _is_total_row(
+        self, row: List[Any], headers: List[str], specialist_idx: int
+    ) -> bool:
+        """Check if a row is a total/summary row using flexible logic.
 
-        return insert_row, True
+        Args:
+            row: Row data
+            headers: Column headers
+            specialist_idx: Index of specialist column
+
+        Returns:
+            True if the row appears to be a total row
+        """
+        # Basic checks for total row
+        if not row[specialist_idx] or row[specialist_idx] == "0":
+            log.debug(
+                "Row has empty specialist column, checking for total row indicators"
+            )
+
+            # Check if row has formulas in cost columns
+            cost_columns = [
+                ColumnName.TOTAL_COST_USD.value,
+                ColumnName.SPECIALIST_WORK_COST_USD.value,
+                ColumnName.CLIENT_WORK_COST_USD.value,
+                ColumnName.REVENUE_USD.value,
+            ]
+
+            for col_name in cost_columns:
+                col_idx = self.google_sheets_service.find_column_index(
+                    headers, [col_name]
+                )
+                if col_idx is not None and len(row) > col_idx:
+                    cell_value = str(row[col_idx]) if row[col_idx] else ""
+                    # Check for formulas (starts with =) or currency values
+                    if cell_value.startswith("=") or (
+                        "$" in cell_value
+                        and cell_value.replace("$", "")
+                        .replace(",", "")
+                        .replace(".", "")
+                        .isdigit()
+                    ):
+                        log.debug(
+                            "Found total row indicator in column '%s': %s",
+                            col_name,
+                            cell_value,
+                        )
+                        return True
+
+            # Additional check: if first column is empty but other columns have data
+            if not row[0] and any(str(cell).strip() for cell in row[1:]):
+                log.debug(
+                    "Found total row indicator: empty first column with data in other columns"
+                )
+                return True
+
+        return False
 
     def _insert_and_update_specialist_row(
         self,
@@ -734,9 +799,16 @@ class TimesheetProjectService:
         """
         sheet_id = sheet.get("properties", {}).get("sheetId")
         target_row = insert_row + 1  # Convert to 1-based indexing
+        
+        log.debug("=== INSERTING SPECIALIST ===")
+        log.debug("Insert row (0-based): %d", insert_row)
+        log.debug("Target row (1-based): %d", target_row)
+        log.debug("Should insert new row: %s", should_insert)
+        log.debug("Specialist name: %s", specialist.name)
 
         # Insert row if needed
         if should_insert:
+            log.debug("INSERTING new row at position %d", insert_row)
             try:
                 request = {
                     "insertDimension": {
@@ -753,13 +825,15 @@ class TimesheetProjectService:
                 self.google_sheets_service.batch_update(
                     spreadsheet_id=spreadsheet_id, requests=[request]
                 )
-                log.debug("Inserted new row at position %d", insert_row)
+                log.debug("Successfully inserted new row at position %d", insert_row)
             except Exception as e:
                 log.warning("Failed to insert row, continuing with update: %s", str(e))
+        else:
+            log.debug("NOT inserting new row, using existing row %d", target_row)
 
         # Find template row to copy formatting and formulas from
         template_row = self._find_template_row_for_specialist(values, headers)
-        
+
         if template_row:
             try:
                 # Copy formatting and formulas from template row
@@ -768,13 +842,15 @@ class TimesheetProjectService:
                     sheet_name=sheet_name,
                     source_row=template_row,
                     target_row=target_row,
-                    paste_type="PASTE_NORMAL"  # Copy everything: formulas, formatting, etc.
+                    paste_type="PASTE_NORMAL",  # Copy everything: formulas, formatting, etc.
                 )
-                log.debug("Copied template from row %d to row %d", template_row, target_row)
+                log.debug(
+                    "Copied template from row %d to row %d", template_row, target_row
+                )
             except Exception as e:
                 log.warning("Failed to copy template formatting: %s", str(e))
         else:
-            # No template row found (first specialist) - add formulas from config
+            # No template row found (first specialist) - just add formulas from config (row already formatted).
             try:
                 self._add_formulas_from_config(
                     spreadsheet_id=spreadsheet_id,
@@ -782,7 +858,7 @@ class TimesheetProjectService:
                     target_row=target_row,
                     headers=headers,
                 )
-                log.debug("Added formulas from config for first specialist")
+                log.debug("Added formulas from config for first specialist (no template row)")
             except Exception as e:
                 log.warning("Failed to add formulas from config: %s", str(e))
 
@@ -819,7 +895,9 @@ class TimesheetProjectService:
                 working_hours_formula = config_service.get_formula(
                     FormulaName.CALCULATE_WORKING_HOURS
                 )
-                range_name = f"{sheet_name}!{self._column_letter(hours_worked_idx)}{target_row}"
+                range_name = (
+                    f"{sheet_name}!{self._column_letter(hours_worked_idx)}{target_row}"
+                )
                 self.google_sheets_service.update_range(
                     spreadsheet_id=spreadsheet_id,
                     range_name=range_name,
@@ -839,7 +917,9 @@ class TimesheetProjectService:
                 gross_total_cost_formula = config_service.get_formula(
                     FormulaName.GROSS_TOTAL_COST
                 )
-                range_name = f"{sheet_name}!{self._column_letter(total_cost_idx)}{target_row}"
+                range_name = (
+                    f"{sheet_name}!{self._column_letter(total_cost_idx)}{target_row}"
+                )
                 self.google_sheets_service.update_range(
                     spreadsheet_id=spreadsheet_id,
                     range_name=range_name,
@@ -879,7 +959,9 @@ class TimesheetProjectService:
                 client_cost_formula = config_service.get_formula(
                     FormulaName.GROSS_TOTAL_COST
                 )
-                range_name = f"{sheet_name}!{self._column_letter(client_cost_idx)}{target_row}"
+                range_name = (
+                    f"{sheet_name}!{self._column_letter(client_cost_idx)}{target_row}"
+                )
                 self.google_sheets_service.update_range(
                     spreadsheet_id=spreadsheet_id,
                     range_name=range_name,
@@ -897,7 +979,9 @@ class TimesheetProjectService:
         if revenue_idx is not None:
             try:
                 revenue_formula = config_service.get_formula(FormulaName.REVENUE)
-                range_name = f"{sheet_name}!{self._column_letter(revenue_idx)}{target_row}"
+                range_name = (
+                    f"{sheet_name}!{self._column_letter(revenue_idx)}{target_row}"
+                )
                 self.google_sheets_service.update_range(
                     spreadsheet_id=spreadsheet_id,
                     range_name=range_name,
@@ -927,13 +1011,15 @@ class TimesheetProjectService:
         """
         # Prepare updates for specialist-specific fields only
         updates = []
-        
+
         # Update specialist name
         specialist_idx = self.google_sheets_service.find_column_index(
             headers, [ColumnName.SPECIALIST.value]
         )
         if specialist_idx is not None:
-            range_name = f"{sheet_name}!{self._column_letter(specialist_idx)}{target_row}"
+            range_name = (
+                f"{sheet_name}!{self._column_letter(specialist_idx)}{target_row}"
+            )
             updates.append((range_name, [[specialist.name]]))
 
         # Update specialist role
@@ -957,7 +1043,9 @@ class TimesheetProjectService:
             headers, [ColumnName.SPECIALIST_HOURLY_RATE_USD.value]
         )
         if internal_rate_idx is not None:
-            range_name = f"{sheet_name}!{self._column_letter(internal_rate_idx)}{target_row}"
+            range_name = (
+                f"{sheet_name}!{self._column_letter(internal_rate_idx)}{target_row}"
+            )
             updates.append((range_name, [[str(specialist.internal_rate)]]))
 
         # For payment distribution sheet, also update client rate
@@ -965,7 +1053,9 @@ class TimesheetProjectService:
             headers, [ColumnName.CLIENT_HOURLY_RATE_USD.value]
         )
         if client_rate_idx is not None:
-            range_name = f"{sheet_name}!{self._column_letter(client_rate_idx)}{target_row}"
+            range_name = (
+                f"{sheet_name}!{self._column_letter(client_rate_idx)}{target_row}"
+            )
             updates.append((range_name, [[str(specialist.external_rate)]]))
 
         # Apply all updates
@@ -980,7 +1070,9 @@ class TimesheetProjectService:
             except Exception as e:
                 log.warning("Failed to update %s: %s", range_name, str(e))
 
-        log.debug("Updated specialist data for %s in row %d", specialist.name, target_row)
+        log.debug(
+            "Updated specialist data for %s in row %d", specialist.name, target_row
+        )
 
     def _update_payment_distribution_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
@@ -1013,11 +1105,20 @@ class TimesheetProjectService:
                 return
 
             # Find insert position
-            insert_row, should_insert = self._find_insert_position_for_specialist(values, headers)
+            insert_row, should_insert = self._find_insert_position_for_specialist(
+                values, headers
+            )
 
             # Insert row if needed and update data
             self._insert_and_update_specialist_row(
-                spreadsheet_id, sheet_name, sheet, insert_row, should_insert, specialist, headers, values
+                spreadsheet_id,
+                sheet_name,
+                sheet,
+                insert_row,
+                should_insert,
+                specialist,
+                headers,
+                values,
             )
 
             log.info("Added %s to %s tab", specialist.name, sheet_name)
@@ -1148,12 +1249,12 @@ class TimesheetProjectService:
             )
 
     def _copy_row_formatting(
-        self, 
-        spreadsheet_id: str, 
-        sheet_name: str, 
-        source_row: int, 
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+        source_row: int,
         target_row: int,
-        paste_type: str = "PASTE_NORMAL"
+        paste_type: str = "PASTE_NORMAL",
     ) -> None:
         """Copy row formatting and formulas from one row to another.
 
@@ -1241,17 +1342,24 @@ class TimesheetProjectService:
             headers, [ColumnName.SPECIALIST.value]
         )
         if specialist_idx is None:
+            log.debug("Specialist column not found in template search")
             return None
 
         # Look for the last row with specialist data (not total/summary rows)
         for i in range(len(values) - 1, 0, -1):  # Start from end, skip header
             row = values[i]
-            if (len(row) > specialist_idx and 
-                row[specialist_idx] and 
-                row[specialist_idx] != "0" and
-                not (len(row) > 2 and "$" in str(row[2]) and not row[0])):  # Skip total rows
+            if (
+                len(row) > specialist_idx
+                and row[specialist_idx]
+                and row[specialist_idx] != "0"
+                and not self._is_total_row(row, headers, specialist_idx)
+            ):
+                log.debug(
+                    "Found template row at position %d: %s", i + 1, row[specialist_idx]
+                )
                 return i + 1  # Convert to 1-based indexing
-        
+
+        log.debug("No template row found")
         return None
 
     def _column_letter(self, index: int) -> str:

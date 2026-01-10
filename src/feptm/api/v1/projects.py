@@ -20,7 +20,9 @@ router = APIRouter()
 class ProjectCreateRequest(BaseModel):
     """Request model for creating a project."""
 
-    project_name: str = Field(..., min_length=1, description="Project name cannot be empty")
+    project_name: str = Field(
+        ..., min_length=1, description="Project name cannot be empty"
+    )
 
 
 @router.post("/create", response_model=ProjectMetaResponse)
