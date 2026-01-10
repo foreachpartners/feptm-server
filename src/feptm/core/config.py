@@ -51,7 +51,9 @@ class Settings(BaseSettings):
     )
 
     # Google Sheets templates - specify your identifiers here or update environment variables
-    # To make templates accessible, "Share by link" must be enabled for them (Share > General Access)
+    # For Service Account: templates must be shared with service account email as Editor
+    # For OAuth: templates must be accessible to authenticated user
+    # Run: uv run python bin/get_service_account_email.py to get service account email
     GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None
     GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None
     GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: Optional[str] = None
