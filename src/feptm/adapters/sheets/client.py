@@ -90,17 +90,24 @@ class PygSheetsClient:
         """
         try:
             log.debug(f"Copying spreadsheet {source_id} to {title}")
-            # Use drive service to copy file
-            # pygsheets client.copy() copies spreadsheet and returns new one
-            source_spreadsheet = self.open_spreadsheet(source_id)
             
-            # Copy via drive API (pygsheets internal)
-            copied_file = self._gc.drive.copy_file(
-                file_id=source_id, title=title, folder_id=folder_id
+            # Use Google Drive API directly to copy file
+            # Build copy request body
+            copy_body = {"name": title}
+            if folder_id:
+                copy_body["parents"] = [folder_id]
+            
+            # Copy file via Drive API
+            copied_file = (
+                self._gc.drive.service.files()
+                .copy(fileId=source_id, body=copy_body, fields="id")
+                .execute()
             )
             
-            # Open copied spreadsheet
-            copied_spreadsheet = self.open_spreadsheet(copied_file["id"])
+            copied_file_id = copied_file["id"]
+            
+            # Open copied spreadsheet as pygsheets Spreadsheet object
+            copied_spreadsheet = self.open_spreadsheet(copied_file_id)
             
             log.info(f"Copied spreadsheet: {copied_spreadsheet.id}")
             return copied_spreadsheet
