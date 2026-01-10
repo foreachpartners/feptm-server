@@ -36,12 +36,11 @@ def get_pygsheets_client() -> "Client":
     Raises:
         GoogleApiError: If authorization fails
     """
-    if not settings.GOOGLE_CREDENTIALS_FILE:
-        raise ValidationError("GOOGLE_CREDENTIALS_FILE not configured")
-
+    # credentials.json is always expected in project root (BASE_DIR)
+    # authorize_pygsheets() will find it automatically
     try:
         gc = authorize_pygsheets(
-            credentials_file=settings.GOOGLE_CREDENTIALS_FILE,
+            credentials_file=None,  # Auto-detect from project root
             token_file=settings.GOOGLE_TOKEN_FILE,
         )
         log.info("Initialized pygsheets client")
@@ -58,12 +57,9 @@ def get_pygsheets_client_wrapper() -> PygSheetsClient:
     Returns:
         PygSheetsClient instance
     """
-    credentials_file = (
-        str(settings.GOOGLE_CREDENTIALS_FILE)
-        if settings.GOOGLE_CREDENTIALS_FILE
-        else None
-    )
-    return PygSheetsClient(credentials_file=credentials_file)
+    # credentials.json is always expected in project root (BASE_DIR)
+    # authorize_pygsheets() will find it automatically if not explicitly provided
+    return PygSheetsClient(credentials_file=None)
 
 
 def get_drive_client() -> GoogleDriveClient:

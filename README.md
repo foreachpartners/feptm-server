@@ -10,7 +10,7 @@ FEPTM (FEP Time & Materials) server provides automation for project management, 
 
 The application follows a clean architecture pattern with clear separation of concerns:
 
-```
+```text
 src/feptm/
 ├── domain/           # Business logic and domain models (infrastructure-agnostic)
 │   ├── models/       # Domain entities (Project, Specialist, PaymentPeriod)
@@ -46,7 +46,7 @@ src/feptm/
 
 - Python 3.12 or higher
 - Google Cloud Project with Sheets API and Drive API enabled
-- OAuth 2.0 credentials file (`credentials.json`)
+- Google credentials file (`credentials.json`)
 
 ### Installation
 
@@ -67,11 +67,44 @@ src/feptm/
    # Edit .env with your configuration
    ```
 
-4. Place Google OAuth credentials in project root as `credentials.json`
+4. Place Google credentials in project root as `credentials.json`
+
+   **Option A: Service Account (Recommended for production)**
+
+   1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+   2. Select your project or create a new one
+   3. Enable **Google Sheets API** and **Google Drive API**
+   4. Go to **IAM & Admin** > **Service Accounts**
+   5. Click **Create Service Account**
+   6. Fill in the service account details and click **Create**
+   7. Grant necessary roles (e.g., **Editor** for Sheets and Drive)
+   8. Click **Done**
+   9. Click on the created service account > **Keys** tab > **Add Key** > **Create new key**
+   10. Select **JSON** format and click **Create**
+   11. Save the downloaded JSON file as `credentials.json` in the project root
+
+   **Option B: OAuth 2.0 Client (For user-specific access)**
+
+   1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+   2. Select your project
+   3. Enable **Google Sheets API** and **Google Drive API**
+   4. Go to **APIs & Services** > **Credentials**
+   5. Click **Create Credentials** > **OAuth client ID**
+   6. If prompted, configure OAuth consent screen:
+      - Choose **External** user type
+      - Fill in required fields (App name, User support email, Developer contact)
+      - Add scopes: `https://www.googleapis.com/auth/spreadsheets` and `https://www.googleapis.com/auth/drive`
+      - Add test users if needed
+   7. Select **Desktop app** as application type
+   8. Click **Create**
+   9. Download the JSON file and save it as `credentials.json` in the project root
+   10. On first run, you'll be prompted to authenticate via browser
 
 ## Running the Application
 
 ### Development Server
+
+Run from project root directory:
 
 ```bash
 uv run python -m bin.run_api
@@ -82,6 +115,8 @@ Or using uvicorn directly:
 ```bash
 uv run uvicorn feptm.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**Note:** Application entry point is `src/feptm/main.py`. The `bin/run_api.py` script automatically adds `src` to Python path.
 
 ### Production Server
 
@@ -154,7 +189,7 @@ uv run isort src/
 
 Key environment variables (see `env.example`):
 
-- `GOOGLE_CREDENTIALS_FILE` - Path to OAuth credentials JSON
+- `GOOGLE_CREDENTIALS_FILE` - Optional override path to credentials file (default: `credentials.json` in project root)
 - `GOOGLE_PROJECT_INFO_TEMPLATE_ID` - Template spreadsheet ID for project info
 - `GOOGLE_PROJECT_REPORT_TEMPLATE_ID` - Template for General Expenses report
 - `GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID` - Template for Payment Distribution
@@ -163,16 +198,34 @@ Key environment variables (see `env.example`):
 
 ## Project Structure
 
-- **Domain Layer** (`domain/`): Business logic, domain models, service protocols
-- **Adapters Layer** (`adapters/`): Google Sheets integration via pygsheets, Google Drive operations
-- **Interfaces Layer** (`interfaces/`): FastAPI endpoints, request/response models
-- **Core** (`core/`): Configuration, exceptions, logging utilities
+```text
+feptm-server/
+├── src/
+│   └── feptm/              # Main package
+│       ├── domain/         # Business logic, domain models, service protocols
+│       ├── adapters/       # Google Sheets integration via pygsheets, Google Drive operations
+│       ├── interfaces/     # FastAPI endpoints, request/response models
+│       ├── core/           # Configuration, exceptions, logging utilities
+│       └── main.py         # FastAPI application entry point (DO NOT MOVE)
+├── bin/
+│   └── run_api.py          # Server startup script (adds src to PYTHONPATH)
+├── tests/                  # Test suite
+├── credentials.json        # Google credentials (MUST be in project root)
+└── .env                    # Environment variables
+```
+
+**Important Notes:**
+- Main application entry point: `src/feptm/main.py`
+- Credentials file `credentials.json` MUST be placed in project root directory
+- The `bin/run_api.py` script automatically adds `src/` to Python path, allowing imports
+- Always run the server from project root: `uv run python -m bin.run_api`
 
 ## Features
 
 ### FR-001: Project Creation
 
 Creates project structure with:
+
 - Google Drive folder
 - Project Info spreadsheet
 - General Expenses report spreadsheet
@@ -181,6 +234,7 @@ Creates project structure with:
 ### FR-002: Team Member Addition
 
 When specialist added to Team sheet:
+
 - Creates personal timesheet from template
 - Updates Team sheet with timesheet ID
 - Creates specialist tabs in reports with IMPORTRANGE formulas
@@ -189,6 +243,7 @@ When specialist added to Team sheet:
 ### FR-002.1: Specialist Rate Periods
 
 Supports multiple rate periods per specialist:
+
 - Rate lookup based on timesheet entry date
 - Multiple rows in Team sheet with same Timesheet ID represent rate history
 - Formulas handle period-appropriate rates
@@ -196,6 +251,7 @@ Supports multiple rate periods per specialist:
 ### FR-004: Payment Period Close
 
 Automates period closure (future enhancement):
+
 - Period name propagation
 - Snapshot creation
 
@@ -209,6 +265,7 @@ Automates period closure (future enhancement):
 4. Create domain service in `domain/services/`
 5. Add API endpoint in `interfaces/api/v1/`
 6. Write tests in `tests/unit/` and `tests/integration/`
+
 
 ### Code Style
 

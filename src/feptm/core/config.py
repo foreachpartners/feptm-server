@@ -28,13 +28,9 @@ class Settings(BaseSettings):
     API_KEY: Optional[str] = None
 
     # Google API settings
-    GOOGLE_CREDENTIALS_FILE: Optional[Path] = (
-        Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
-        if (
-            Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
-        ).exists()
-        else None
-    )
+    # Always expects credentials.json in project root (BASE_DIR)
+    # Can be overridden via GOOGLE_CREDENTIALS_FILE env variable
+    GOOGLE_CREDENTIALS_FILE: Optional[Union[str, Path]] = None
     GOOGLE_TOKEN_FILE: Optional[Path] = (
         Path(os.environ.get("HOME", os.path.expanduser("~")))
         / ".google_sheets_token.json"
@@ -68,10 +64,24 @@ class Settings(BaseSettings):
     @root_validator(pre=True)
     def expand_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Process all Path fields, expanding tildes and converting to Path type."""
+        base_dir = Path(__file__).resolve().parent.parent.parent.parent
+        
         for field_name, field_value in values.items():
             if isinstance(field_value, str) and "~" in field_value:
                 # If it's a string with a tilde - expand the path
                 values[field_name] = os.path.expanduser(field_value)
+        
+        # Always use credentials.json in project root (BASE_DIR)
+        # Override only if explicitly set via env variable
+        if "GOOGLE_CREDENTIALS_FILE" not in values or not values.get("GOOGLE_CREDENTIALS_FILE"):
+            values["GOOGLE_CREDENTIALS_FILE"] = base_dir / "credentials.json"
+        elif values.get("GOOGLE_CREDENTIALS_FILE"):
+            # If provided, resolve relative to project root
+            creds_path = Path(values["GOOGLE_CREDENTIALS_FILE"])
+            if not creds_path.is_absolute():
+                creds_path = base_dir / creds_path
+            values["GOOGLE_CREDENTIALS_FILE"] = creds_path
+        
         return values
 
     model_config = SettingsConfigDict(
