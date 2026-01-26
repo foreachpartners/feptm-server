@@ -1,12 +1,13 @@
 """Mappers for converting between domain models and spreadsheet data."""
 
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, List
 
 from feptm.adapters.sheets.constants import RowName
 from feptm.core.constants import DateFormat
 from feptm.core.exceptions import ValidationError
+from feptm.core.utils import parse_decimal_safely
 from feptm.domain.models.project import Project
 from feptm.domain.models.specialist import Rate, Specialist
 
@@ -55,18 +56,23 @@ def row_to_specialist(row: List[str], timesheet_id: str) -> Specialist:
     if not role:
         raise ValidationError("Specialist role is required")
 
-    # Parse rates
-    try:
-        internal_rate = Decimal(internal_rate_str)
-        external_rate = Decimal(external_rate_str)
-    except ValueError as e:
-        raise ValidationError(f"Invalid rate value: {e}") from e
+    # Parse rates (handles comma as decimal separator)
+    internal_rate = parse_decimal_safely(internal_rate_str, Decimal("0"))
+    external_rate = parse_decimal_safely(external_rate_str, Decimal("0"))
 
-    # Parse start date (FR-002.1: YYYY-MM-DD format)
-    try:
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-    except ValueError as e:
-        raise ValidationError(f"Invalid date format (expected YYYY-MM-DD): {e}") from e
+    # Parse start date (try multiple formats)
+    start_date = None
+    date_formats = ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y"]
+    for fmt in date_formats:
+        try:
+            start_date = datetime.strptime(start_date_str, fmt).date()
+            break
+        except ValueError:
+            continue
+    
+    if start_date is None:
+        # Default to today if date parsing fails
+        start_date = date.today()
 
     # Create rate
     rate = Rate(

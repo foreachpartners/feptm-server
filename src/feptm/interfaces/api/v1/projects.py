@@ -94,7 +94,8 @@ async def sync_project_specialists(
 ) -> ProjectSyncResponse:
     """Synchronize specialists for a project.
 
-    FR-002: Detects new specialists, creates timesheets, updates reports.
+    FR-002: Detects new specialists (without Timesheet ID), creates timesheets,
+    updates Team sheet with Timesheet ID, creates report tabs.
 
     Args:
         request: Project sync request
@@ -108,27 +109,25 @@ async def sync_project_specialists(
         HTTPException: If synchronization fails
     """
     try:
-        # Get project
+        # Verify project exists
         project = project_service.get_project(request.project_id)
 
-        # Get existing specialists
-        existing_specialists = specialist_service.get_project_team(request.project_id)
+        # Sync specialists: find new ones, create timesheets, update reports
+        created_specialists = specialist_service.sync_project_specialists(
+            request.project_id
+        )
 
-        # Read Team sheet to find new specialists
-        # For now, simplified: assumes all specialists need timesheets
-        # In full implementation, would compare Team sheet vs existing timesheets
-
-        created_count = 0
-        all_specialists = existing_specialists.copy()
-
-        # Simplified: in full implementation, would read Team sheet and create missing timesheets
-        # For now, return existing specialists
+        # Get updated list of all specialists
+        all_specialists = specialist_service.get_project_team(request.project_id)
 
         return ProjectSyncResponse(
             project_id=request.project_id,
             specialists_found=len(all_specialists),
-            specialists_created=created_count,
-            specialists=[],  # Simplified - would convert to dicts
+            specialists_created=len(created_specialists),
+            specialists=[
+                {"name": s.name, "role": s.role, "rates_count": len(s.rates)}
+                for s in created_specialists
+            ],
         )
 
     except NotFoundError as e:

@@ -44,9 +44,11 @@ class GoogleDriveClient:
             if parent_id:
                 folder_metadata["parents"] = [parent_id]
 
+            # supportsAllDrives=True enables support for Shared Drives (Google Workspace)
+            # This is required when creating folders in Shared Drives or when using service accounts
             folder = (
                 self._drive.service.files()
-                .create(body=folder_metadata, fields="id")
+                .create(body=folder_metadata, fields="id", supportsAllDrives=True)
                 .execute()
             )
 

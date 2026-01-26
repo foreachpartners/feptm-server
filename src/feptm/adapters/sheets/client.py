@@ -3,6 +3,7 @@
 from typing import Any, List, Optional
 
 import pygsheets
+from googleapiclient.errors import HttpError
 from pygsheets import Spreadsheet, Worksheet
 
 from feptm.adapters.google.auth import authorize_pygsheets
@@ -98,9 +99,16 @@ class PygSheetsClient:
                 copy_body["parents"] = [folder_id]
             
             # Copy file via Drive API
+            # supportsAllDrives=True enables support for Shared Drives (Google Workspace)
+            # This is required when copying to Shared Drives or when using service accounts
             copied_file = (
                 self._gc.drive.service.files()
-                .copy(fileId=source_id, body=copy_body, fields="id")
+                .copy(
+                    fileId=source_id,
+                    body=copy_body,
+                    fields="id",
+                    supportsAllDrives=True,
+                )
                 .execute()
             )
             
@@ -115,6 +123,39 @@ class PygSheetsClient:
             from feptm.core.exceptions import NotFoundError
 
             raise NotFoundError(f"Source spreadsheet not found: {source_id}")
+        except HttpError as e:
+            # Check for storage quota exceeded error
+            error_str = str(e)
+            error_details = getattr(e, "error_details", [])
+            
+            # Check error details for storageQuotaExceeded reason
+            is_quota_error = False
+            for detail in error_details:
+                if isinstance(detail, dict) and detail.get("reason") == "storageQuotaExceeded":
+                    is_quota_error = True
+                    break
+            
+            # Also check error message string as fallback
+            if not is_quota_error and "storage quota" in error_str.lower():
+                is_quota_error = True
+            
+            if is_quota_error:
+                log.error("Google Drive storage quota exceeded")
+                raise GoogleApiError(
+                    "Google Drive storage quota exceeded. "
+                    "Possible causes:\n"
+                    "1. Service account's Drive quota is full (15GB free limit)\n"
+                    "2. Files are being copied to a user-owned folder (consumes service account quota)\n"
+                    "Solutions:\n"
+                    "- Use a Shared Drive (Google Workspace) - files there use Shared Drive quota\n"
+                    "- Use OAuth instead of Service Account to use your personal quota\n"
+                    "- Free up space in service account's Drive\n"
+                    "- Check service account's Drive usage in Google Cloud Console"
+                ) from e
+            
+            # Other HTTP errors
+            log.error(f"Failed to copy spreadsheet: {e}")
+            raise GoogleApiError(f"Failed to copy spreadsheet: {e}") from e
         except Exception as e:
             log.error(f"Failed to copy spreadsheet: {e}")
             raise GoogleApiError(f"Failed to copy spreadsheet: {e}") from e

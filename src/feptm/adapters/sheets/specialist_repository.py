@@ -157,6 +157,139 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
             log.error(f"Failed to get specialists for project {project_id}: {e}")
             raise NotFoundError(f"Failed to get specialists: {e}") from e
 
+    def get_specialists_without_timesheet(
+        self, project_id: str
+    ) -> List[tuple[Specialist, int]]:
+        """Get specialists from Team sheet that don't have Timesheet ID.
+
+        FR-002: Finds new specialists that need timesheets created.
+
+        Args:
+            project_id: External project ID (Project Info spreadsheet ID)
+
+        Returns:
+            List of (Specialist, row_index) tuples for specialists without Timesheet ID
+
+        Raises:
+            NotFoundError: If project not found
+        """
+        try:
+            spreadsheet = self._client.open_spreadsheet(project_id)
+            ws = spreadsheet.worksheet_by_title(SheetName.TEAM.value)
+            if not ws:
+                raise NotFoundError(
+                    f"Team sheet not found in spreadsheet {project_id}"
+                )
+
+            data = ws.get_values("A1", "F100")
+            if not data or len(data) < 2:
+                return []
+
+            result = []
+            for i, row in enumerate(data[1:], start=2):  # Skip header, 1-based row index
+                # Check if row has data but no Timesheet ID
+                if len(row) >= 4 and row[0] and row[1]:  # Has Name and Role
+                    has_timesheet_id = len(row) >= 6 and row[5] and row[5].strip()
+                    if not has_timesheet_id:
+                        # Create specialist from row data
+                        name = row[0].strip()
+                        role = row[1].strip()
+                        internal_rate_str = row[2].strip() if len(row) > 2 and row[2] else "0"
+                        external_rate_str = row[3].strip() if len(row) > 3 and row[3] else "0"
+                        start_date_str = row[4].strip() if len(row) > 4 and row[4] else ""
+
+                        from decimal import Decimal
+                        from datetime import date, datetime
+                        from feptm.core.utils import parse_decimal_safely
+                        from feptm.domain.models.specialist import Rate
+
+                        internal_rate = parse_decimal_safely(internal_rate_str, Decimal("0"))
+                        external_rate = parse_decimal_safely(external_rate_str, Decimal("0"))
+
+                        # Parse date
+                        start_date = date.today()
+                        if start_date_str:
+                            for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y"]:
+                                try:
+                                    start_date = datetime.strptime(start_date_str, fmt).date()
+                                    break
+                                except ValueError:
+                                    continue
+
+                        rate = Rate(
+                            internal=internal_rate,
+                            external=external_rate,
+                            start_date=start_date,
+                        )
+
+                        specialist = Specialist(
+                            name=name,
+                            role=role,
+                            rates=[rate],
+                            joined_date=start_date,
+                        )
+
+                        result.append((specialist, i))
+
+            log.info(f"Found {len(result)} specialists without timesheet in project {project_id}")
+            return result
+
+        except NotFoundError:
+            raise
+        except Exception as e:
+            log.error(f"Failed to get specialists without timesheet: {e}")
+            raise NotFoundError(f"Failed to get specialists: {e}") from e
+
+    def update_team_sheet_timesheet_id(
+        self, project_id: str, row_index: int, timesheet_id: str
+    ) -> None:
+        """Update Timesheet ID column for a specific row in Team sheet.
+
+        Args:
+            project_id: External project ID (Project Info spreadsheet ID)
+            row_index: Row index (1-based)
+            timesheet_id: Timesheet ID to write
+
+        Raises:
+            NotFoundError: If project not found
+            GoogleApiError: If update fails
+        """
+        try:
+            spreadsheet = self._client.open_spreadsheet(project_id)
+            ws = spreadsheet.worksheet_by_title(SheetName.TEAM.value)
+            if not ws:
+                raise NotFoundError(
+                    f"Team sheet not found in spreadsheet {project_id}"
+                )
+
+            # Write Timesheet ID to column F (6th column)
+            ws.update_value(f"F{row_index}", timesheet_id)
+            log.info(f"Updated Timesheet ID in row {row_index} to {timesheet_id}")
+
+        except NotFoundError:
+            raise
+        except Exception as e:
+            log.error(f"Failed to update Team sheet Timesheet ID: {e}")
+            raise GoogleApiError(f"Failed to update Team sheet: {e}") from e
+
+    def create_report_tabs(
+        self, project_id: str, specialist: Specialist, timesheet_id: str
+    ) -> None:
+        """Create specialist tabs in reports and apply formulas.
+
+        FR-002.5-8: Creates tabs in General Expenses and Payment Distribution reports
+        with IMPORTRANGE formulas, adds rows to Current Period sheets.
+
+        Args:
+            project_id: External project ID (Project Info spreadsheet ID)
+            specialist: Specialist domain model
+            timesheet_id: Timesheet ID
+
+        Raises:
+            GoogleApiError: If operation fails
+        """
+        self._create_report_tabs_and_formulas(project_id, specialist, timesheet_id)
+
     def update_team_sheet(
         self, project_id: str, specialist: Specialist, timesheet_id: str
     ) -> None:
