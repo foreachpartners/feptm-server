@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, List
 
-from feptm.adapters.sheets.constants import RowName
+from feptm.adapters.sheets.constants import ColumnName, RowName, TeamSheetConfig
 from feptm.core.constants import DateFormat
 from feptm.core.exceptions import ValidationError
 from feptm.core.utils import parse_decimal_safely
@@ -12,37 +12,90 @@ from feptm.domain.models.project import Project
 from feptm.domain.models.specialist import Rate, Specialist
 
 
-def row_to_specialist(row: List[str], timesheet_id: str) -> Specialist:
-    """Convert Team sheet row to Specialist domain model.
+def build_column_index(headers: List[str]) -> dict[str, int]:
+    """Build column name to index mapping from header row.
+    
+    Args:
+        headers: Header row with column names
+        
+    Returns:
+        Dict mapping column name (lowercase) to column index
+    """
+    return {str(h).strip().lower(): i for i, h in enumerate(headers) if h}
+
+
+def get_column_letter(col_index: dict[str, int], column_name: str) -> str | None:
+    """Get column letter (A, B, C...) for a column name.
+    
+    Args:
+        col_index: Column name to index mapping
+        column_name: Column name to look up
+        
+    Returns:
+        Column letter or None if not found
+    """
+    key = column_name.lower()
+    if key not in col_index:
+        return None
+    idx = col_index[key]
+    # Convert 0-based index to column letter (A=0, B=1, ..., Z=25, AA=26...)
+    result = ""
+    while idx >= 0:
+        result = chr(ord('A') + idx % 26) + result
+        idx = idx // 26 - 1
+    return result
+
+
+def get_cell_value(row: List[str], col_index: dict[str, int], column_name: str, default: str = "") -> str:
+    """Get cell value by column name.
+    
+    Args:
+        row: Data row
+        col_index: Column name to index mapping
+        column_name: Column name to look up
+        default: Default value if column not found or empty
+        
+    Returns:
+        Cell value or default
+    """
+    key = column_name.lower()
+    if key not in col_index:
+        return default
+    idx = col_index[key]
+    if idx >= len(row):
+        return default
+    value = row[idx]
+    return str(value).strip() if value else default
+
+
+def row_to_specialist(
+    row: List[str], 
+    col_index: dict[str, int], 
+    timesheet_id: str
+) -> Specialist:
+    """Convert Team sheet row to Specialist using column name mapping.
 
     FR-002.1: One row represents one rate period. Multiple rows with same
-    Timesheet ID represent rate history. This function creates a Specialist
-    with one rate period. Multiple calls with same timesheet_id should be
-    merged to create a Specialist with multiple rates.
+    Timesheet ID represent rate history.
 
     Args:
-        row: Team sheet row data [Name, Role, Internal Rate, External Rate, Start Date, Timesheet]
+        row: Data row
+        col_index: Column name to index mapping from build_column_index()
         timesheet_id: Timesheet ID (specialist identifier)
 
     Returns:
         Specialist domain model with one rate period
 
     Raises:
-        ValidationError: If row data is invalid
-
-    Note:
-        Team sheet structure (FR-002.1):
-        Name | Role | Internal Rate | External Rate | Start Date | Timesheet
+        ValidationError: If required data is missing
     """
-    if len(row) < 6:
-        raise ValidationError(f"Invalid row data: expected 6 columns, got {len(row)}")
-
-    name = row[0].strip() if row[0] else ""
-    role = row[1].strip() if row[1] else ""
-    internal_rate_str = row[2].strip() if row[2] else "0"
-    external_rate_str = row[3].strip() if row[3] else "0"
-    start_date_str = row[4].strip() if row[4] else ""
-    row_timesheet_id = row[5].strip() if len(row) > 5 and row[5] else ""
+    # Get values by column name
+    name = get_cell_value(row, col_index, ColumnName.NAME.value)
+    role = get_cell_value(row, col_index, ColumnName.ROLE.value)
+    internal_rate_str = get_cell_value(row, col_index, ColumnName.INTERNAL_RATE.value, "0")
+    external_rate_str = get_cell_value(row, col_index, ColumnName.EXTERNAL_RATE.value, "0")
+    start_date_str = get_cell_value(row, col_index, ColumnName.DATE.value)
+    row_timesheet_id = get_cell_value(row, col_index, ColumnName.TIMESHEET.value)
 
     # Validate timesheet ID matches (for safety)
     if row_timesheet_id and row_timesheet_id != timesheet_id:
@@ -60,19 +113,8 @@ def row_to_specialist(row: List[str], timesheet_id: str) -> Specialist:
     internal_rate = parse_decimal_safely(internal_rate_str, Decimal("0"))
     external_rate = parse_decimal_safely(external_rate_str, Decimal("0"))
 
-    # Parse start date (try multiple formats)
-    start_date = None
-    date_formats = ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y"]
-    for fmt in date_formats:
-        try:
-            start_date = datetime.strptime(start_date_str, fmt).date()
-            break
-        except ValueError:
-            continue
-    
-    if start_date is None:
-        # Default to today if date parsing fails
-        start_date = date.today()
+    # Parse start date
+    start_date = _parse_date(start_date_str)
 
     # Create rate
     rate = Rate(
@@ -81,18 +123,37 @@ def row_to_specialist(row: List[str], timesheet_id: str) -> Specialist:
         start_date=start_date,
     )
 
-    # Create specialist with one rate
-    specialist = Specialist(
+    return Specialist(
         name=name,
         role=role,
         rates=[rate],
-        joined_date=start_date,  # Use first rate start_date as joined_date
+        joined_date=start_date,
     )
 
-    return specialist
+
+def _parse_date(date_str: str) -> date:
+    """Parse date string in multiple formats.
+    
+    Args:
+        date_str: Date string
+        
+    Returns:
+        Parsed date or today if parsing fails
+    """
+    if not date_str:
+        return date.today()
+        
+    date_formats = ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y", "%b %d, %Y"]
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    
+    return date.today()
 
 
-def specialist_to_row(specialist: Specialist, timesheet_id: str) -> List[List[str]]:
+def specialist_to_row(specialist: Specialist, timesheet_id: str, project_name: str = "") -> List[List[str]]:
     """Convert Specialist domain model to Team sheet rows.
 
     FR-002.1: One Specialist may produce multiple rows (one per rate period).
@@ -100,18 +161,21 @@ def specialist_to_row(specialist: Specialist, timesheet_id: str) -> List[List[st
     Args:
         specialist: Specialist domain model (may contain multiple rates)
         timesheet_id: Timesheet ID (specialist identifier)
+        project_name: Project name for column C
 
     Returns:
         List of rows, one per rate period
 
     Note:
-        Each row: [Name, Role, Internal Rate, External Rate, Start Date, Timesheet]
+        Each row: [Name, Role, Project, Internal Rate, External Rate, Date, Timesheet]
+        A: Name | B: Role | C: Project | D: Internal Rate | E: External Rate | F: Date | G: Timesheet
     """
     rows = []
     for rate in sorted(specialist.rates, key=lambda r: r.start_date):
         row = [
             specialist.name,
             specialist.role,
+            project_name,  # Column C: Project
             str(rate.internal),
             str(rate.external),
             rate.start_date.strftime("%Y-%m-%d"),

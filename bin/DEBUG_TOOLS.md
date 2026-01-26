@@ -148,18 +148,36 @@ uv run python bin/inspect_project.py <project_info_spreadsheet_id>
 
 ---
 
-## Column Index Reference
+## Column Name Reference
 
-Based on actual template structure:
+Column names defined in `src/feptm/adapters/sheets/constants.py` (`ColumnName` enum):
 
-| Column | Letter | Index | Field |
-|--------|--------|-------|-------|
-| A | 0 | Name |
-| B | 1 | Role |
-| C | 2 | Project |
-| D | 3 | Internal Rate |
-| E | 4 | External Rate |
-| F | 5 | Date |
-| G | 6 | Timesheet (ID) |
+| Team Sheet Column | ColumnName Enum |
+|-------------------|-----------------|
+| Name | `ColumnName.NAME` |
+| Role | `ColumnName.ROLE` |
+| Project | `ColumnName.PROJECT` |
+| Internal Rate | `ColumnName.INTERNAL_RATE` |
+| External Rate | `ColumnName.EXTERNAL_RATE` |
+| Date | `ColumnName.DATE` |
+| Timesheet | `ColumnName.TIMESHEET` |
 
-Code MUST use these indices when reading/writing Team sheet.
+## Helper Functions (`mappers.py`)
+
+- `build_column_index(headers)` - Build column name -> index mapping from header row
+- `get_cell_value(row, col_index, column_name)` - Get cell value by column name
+- `get_column_letter(col_index, column_name)` - Get column letter (A, B, C...) by name
+
+## Configuration Classes
+
+- `TeamSheetConfig` - Team sheet data range (`START_CELL`, `END_CELL`)
+- `ProjectInfoConfig` - Project info sheet range
+- `CurrentPeriodConfig` - Current period sheet range
+
+## Best Practices
+
+- DO NOT hardcode column indices or letters
+- Use `ColumnName` enum for column names
+- Use `build_column_index()` to map headers to indices
+- Use `get_cell_value()` to read cells by column name
+- Use `get_column_letter()` to write cells by column name

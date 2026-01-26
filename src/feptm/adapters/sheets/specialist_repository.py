@@ -5,7 +5,13 @@ from typing import List
 import pygsheets
 
 from feptm.adapters.sheets.client import PygSheetsClient
-from feptm.adapters.sheets.constants import ColumnName, SheetName
+from feptm.adapters.sheets.constants import (
+    ColumnName,
+    CurrentPeriodConfig,
+    ProjectInfoConfig,
+    SheetName,
+    TeamSheetConfig,
+)
 from feptm.adapters.sheets.formula_templates import (
     CALCULATE_HOURS,
     GROSS_TOTAL,
@@ -14,6 +20,9 @@ from feptm.adapters.sheets.formula_templates import (
     REVENUE,
 )
 from feptm.adapters.sheets.mappers import (
+    build_column_index,
+    get_cell_value,
+    get_column_letter,
     merge_specialists_by_timesheet_id,
     row_to_specialist,
     specialist_to_row,
@@ -121,27 +130,29 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                     f"Team sheet not found in spreadsheet {project_id}"
                 )
 
-            # Read Team sheet data (skip header row)
-            # pygsheets get_values returns list of rows
-            data = ws.get_values("A1", "F100")
+            # Read Team sheet data
+            data = ws.get_values(TeamSheetConfig.START_CELL, TeamSheetConfig.END_CELL)
             if not data or len(data) < 2:
                 return []
+
+            # Build column index from header row
+            col_index = build_column_index(data[0])
 
             # Group rows by Timesheet ID (FR-002.1)
             specialists_dict: dict[str, list[list[str]]] = {}
             for row in data[1:]:  # Skip header
-                if len(row) >= 6 and row[5]:  # Has Timesheet ID
-                    timesheet_id = row[5].strip()
-                    if timesheet_id not in specialists_dict:
-                        specialists_dict[timesheet_id] = []
-                    specialists_dict[timesheet_id].append(row)
+                ts_id = get_cell_value(row, col_index, ColumnName.TIMESHEET.value)
+                if ts_id:
+                    if ts_id not in specialists_dict:
+                        specialists_dict[ts_id] = []
+                    specialists_dict[ts_id].append(row)
 
             # Convert rows to specialists and merge by Timesheet ID
             specialists_list = []
             for timesheet_id, rows in specialists_dict.items():
                 # Each row represents a rate period (FR-002.1)
                 rate_specialists = [
-                    row_to_specialist(row, timesheet_id) for row in rows
+                    row_to_specialist(row, col_index, timesheet_id) for row in rows
                 ]
                 # Merge into one specialist with multiple rates
                 merged = merge_specialists_by_timesheet_id(rate_specialists)
@@ -181,40 +192,35 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                     f"Team sheet not found in spreadsheet {project_id}"
                 )
 
-            data = ws.get_values("A1", "F100")
+            data = ws.get_values(TeamSheetConfig.START_CELL, TeamSheetConfig.END_CELL)
             if not data or len(data) < 2:
                 return []
+
+            # Build column index from header row
+            col_index = build_column_index(data[0])
 
             result = []
             for i, row in enumerate(data[1:], start=2):  # Skip header, 1-based row index
                 # Check if row has data but no Timesheet ID
-                if len(row) >= 4 and row[0] and row[1]:  # Has Name and Role
-                    has_timesheet_id = len(row) >= 6 and row[5] and row[5].strip()
-                    if not has_timesheet_id:
-                        # Create specialist from row data
-                        name = row[0].strip()
-                        role = row[1].strip()
-                        internal_rate_str = row[2].strip() if len(row) > 2 and row[2] else "0"
-                        external_rate_str = row[3].strip() if len(row) > 3 and row[3] else "0"
-                        start_date_str = row[4].strip() if len(row) > 4 and row[4] else ""
-
+                name = get_cell_value(row, col_index, ColumnName.NAME.value)
+                role = get_cell_value(row, col_index, ColumnName.ROLE.value)
+                
+                if name and role:  # Has Name and Role
+                    ts_id = get_cell_value(row, col_index, ColumnName.TIMESHEET.value)
+                    if not ts_id:
+                        # Create specialist from row data using mapper
+                        from feptm.adapters.sheets.mappers import _parse_date
                         from decimal import Decimal
-                        from datetime import date, datetime
                         from feptm.core.utils import parse_decimal_safely
                         from feptm.domain.models.specialist import Rate
 
+                        internal_rate_str = get_cell_value(row, col_index, ColumnName.INTERNAL_RATE.value, "0")
+                        external_rate_str = get_cell_value(row, col_index, ColumnName.EXTERNAL_RATE.value, "0")
+                        start_date_str = get_cell_value(row, col_index, ColumnName.DATE.value)
+
                         internal_rate = parse_decimal_safely(internal_rate_str, Decimal("0"))
                         external_rate = parse_decimal_safely(external_rate_str, Decimal("0"))
-
-                        # Parse date
-                        start_date = date.today()
-                        if start_date_str:
-                            for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y"]:
-                                try:
-                                    start_date = datetime.strptime(start_date_str, fmt).date()
-                                    break
-                                except ValueError:
-                                    continue
+                        start_date = _parse_date(start_date_str)
 
                         rate = Rate(
                             internal=internal_rate,
@@ -262,8 +268,19 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                     f"Team sheet not found in spreadsheet {project_id}"
                 )
 
-            # Write Timesheet ID to column F (6th column)
-            ws.update_value(f"F{row_index}", timesheet_id)
+            # Get header row to find Timesheet column
+            header_data = ws.get_values("A1", "Z1")
+            if not header_data or not header_data[0]:
+                raise ValidationError("Team sheet has no headers")
+            
+            col_index = build_column_index(header_data[0])
+            ts_column = get_column_letter(col_index, ColumnName.TIMESHEET.value)
+            if not ts_column:
+                raise ValidationError(f"Column '{ColumnName.TIMESHEET.value}' not found in Team sheet")
+
+            # Write Timesheet ID to Timesheet column
+            cell = f"{ts_column}{row_index}"
+            ws.update_value(cell, timesheet_id)
             log.info(f"Updated Timesheet ID in row {row_index} to {timesheet_id}")
 
         except NotFoundError:
@@ -316,7 +333,8 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                 )
 
             # FR-002.1: Create rows for each rate period
-            rows = specialist_to_row(specialist, timesheet_id)
+            project_name = self._get_project_name(project_id)
+            rows = specialist_to_row(specialist, timesheet_id, project_name)
 
             # Check if specialist already exists (by Timesheet ID)
             existing_rows = self._find_rows_by_timesheet_id(ws, timesheet_id)
@@ -328,7 +346,7 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                 start_row = len(existing_rows) + 2  # After existing rows, skip header
             else:
                 # New specialist: append at end
-                existing_data = ws.get_values("A1", "F100")
+                existing_data = ws.get_values(TeamSheetConfig.START_CELL, TeamSheetConfig.END_CELL)
                 start_row = len(existing_data) + 1 if existing_data else 2
 
             # Write rows for each rate period
@@ -364,13 +382,17 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
         Returns:
             List of row indices (1-based)
         """
-        data = worksheet.get_values("A1", "F100")
+        data = worksheet.get_values(TeamSheetConfig.START_CELL, TeamSheetConfig.END_CELL)
         if not data or len(data) < 2:
             return []
 
+        # Build column index from header row
+        col_index = build_column_index(data[0])
+
         rows = []
         for i, row in enumerate(data[1:], start=2):  # Skip header, 1-based
-            if len(row) >= 6 and row[5] and str(row[5]).strip() == timesheet_id:
+            ts_id = get_cell_value(row, col_index, ColumnName.TIMESHEET.value)
+            if ts_id == timesheet_id:
                 rows.append(i)
 
         return rows
@@ -485,7 +507,7 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
                 return
 
             # Find next empty row (after header)
-            data = ws.get_values("A1", "I100")
+            data = ws.get_values(CurrentPeriodConfig.START_CELL, CurrentPeriodConfig.END_CELL)
             if not data:
                 next_row = 2
             else:
@@ -551,7 +573,9 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
             )
 
         except Exception as e:
+            import traceback
             log.error(f"Failed to add specialist to Current Period: {e}")
+            log.error(f"Traceback: {traceback.format_exc()}")
             raise
 
     def _get_project_folder_id(self, project_id: str) -> str | None:
@@ -571,7 +595,7 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
             if not ws:
                 return None
 
-            data = ws.get_values("A1", "B20")
+            data = ws.get_values(ProjectInfoConfig.START_CELL, ProjectInfoConfig.END_CELL)
             if not data:
                 return None
 
@@ -610,7 +634,7 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
             if not ws:
                 return "Unknown"
 
-            data = ws.get_values("A1", "B20")
+            data = ws.get_values(ProjectInfoConfig.START_CELL, ProjectInfoConfig.END_CELL)
             if not data:
                 return "Unknown"
 
@@ -641,7 +665,7 @@ class SpreadsheetSpecialistRepository(SpecialistRepository):
             if not ws:
                 return None, None
 
-            data = ws.get_values("A1", "B20")
+            data = ws.get_values(ProjectInfoConfig.START_CELL, ProjectInfoConfig.END_CELL)
             if not data:
                 return None, None
 
