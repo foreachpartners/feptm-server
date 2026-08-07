@@ -1,0 +1,25 @@
+id: FR-SPECIALIST-001
+title: Manage specialist participation in calculations through status
+description: |
+  The user manages a specialist's participation in current calculations through
+  the required Status column with Active and Inactive values. A new specialist
+  is Active by default. When the status changes to Inactive, calculated amounts
+  are frozen, and no new accruals are generated.
+priority: must
+
+acceptance_criteria:
+  - "The Team sheet contains the required Status column."
+  - "When a specialist is added to Team, Status defaults to Active."
+  - "A row with an empty name, an empty Status, or a Status other than Active or Inactive is skipped during sync without changing related data."
+  - "Team rows with the same name are skipped during sync without changing related data."
+  - "After Status changes from Active to Inactive, the next sync freezes the specialist's calculated amounts in the Current period tabs. The row remains in its original position, displays Inactive in gray text, and remains included in the current period totals, but receives no new accruals during subsequent syncs."
+  - "Changing Status to Inactive does not delete the Team row, personal timesheet, personal tabs, frozen accruals, or closed-period data."
+  - "Repeated sync with unchanged data does not create duplicate timesheets, personal tabs, or report rows."
+
+implements:
+  - src/feptm/api/v1/projects.py::sync_project_specialists
+  - src/feptm/models/specialist.py
+  - src/feptm/timesheets/specialist_service.py
+  - src/feptm/timesheets/project_service.py
+  - src/feptm/timesheets/config_service.py
+  - src/feptm/services/google_sheets_service

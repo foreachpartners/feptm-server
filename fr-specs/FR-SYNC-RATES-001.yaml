@@ -1,0 +1,25 @@
+id: FR-SYNC-RATES-001
+title: Update specialist rates during sync
+description: |
+  The user updates the existing Internal Rate and External Rate of an active
+  specialist in the Team sheet and runs sync.
+
+  The system replaces the specialist's rates in the current financial reports
+  and recalculates the entire open period using the latest rate values.
+  Financial data for closed archived periods remains unchanged.
+priority: must
+
+acceptance_criteria:
+  - "If an active specialist's Internal Rate or External Rate changes, sync applies the new value to the current financial reports."
+  - "After a rate change, the entire open period is recalculated using the latest rate value."
+  - "Rate changes do not affect financial data for closed archived periods."
+  - "After a successful sync, all current project financial reports display the updated calculations."
+  - "An invalid rate preserves the previous rates and calculations; sync identifies the specialist and the error reason, then continues processing other valid rows."
+  - "Running sync again without changing rates does not modify the calculation results."
+
+implements:
+  - src/feptm/api/v1/projects.py::sync_project_specialists
+  - src/feptm/models/specialist.py
+  - src/feptm/timesheets/specialist_service.py
+  - src/feptm/timesheets/project_service.py
+  - src/feptm/timesheets/config_service.py
