@@ -93,6 +93,7 @@ async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
         raise HTTPException(status_code=500, detail=f"Failed to create project: {e}")
 
 
+# @req FR-SYNC-001, FR-SPECIALIST-001
 @router.post("/sync", response_model=ProjectSyncResponse)
 async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncResponse:
     try:
@@ -121,7 +122,7 @@ async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncRe
         )
 
 
-# @req FR-SYNC-RATES-001
+# @req FR-SYNC-RATES-001, FR-SYNC-001
 @router.post("/sync-rates", response_model=ProjectSyncRatesResponse)
 async def sync_project_rates(
     request: ProjectSyncRatesRequest,

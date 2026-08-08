@@ -63,16 +63,18 @@ class TimesheetProjectService:
             folder_id=project.drive_folder_id, project_name=project.name
         )
 
-        specialists, new_count = self._specialists.list_from_sheet(project_id)
+        specialists, _ = self._specialists.list_from_sheet(project_id)
 
         if not specialists:
             return [], 0, 0
 
+        new_count = 0
         for sp in specialists:
             if not sp.timesheet:
                 self._specialists.create_timesheet(
                     sp, context, self._timesheet_template_id
                 )
+                new_count += 1
 
         if new_count > 0:
             self._specialists.update_timesheet_ids(project_id, "Team", specialists)
@@ -106,27 +108,57 @@ class TimesheetProjectService:
     def sync_project_rates(
         self, project_id: str
     ) -> tuple[list[Specialist], int]:
-        project = self._projects.get_project_metadata(project_id)
         specialists, _ = self._specialists.list_from_sheet(project_id)
         if not specialists:
             return [], 0
 
-        updated_count = 0
+        project = self._projects.get_project_metadata(project_id)
+
+        if not project.drive_folder_id:
+            raise Exception(
+                f"Cannot sync rates: drive folder ID not found for project '{project.name}'."
+            )
+
+        context = TimesheetContext(
+            folder_id=project.drive_folder_id, project_name=project.name
+        )
+
+        specialists, _ = self._specialists.list_from_sheet(project_id)
+        if not specialists:
+            return [], 0
+
+        created_count = 0
+        for sp in specialists:
+            if not sp.timesheet:
+                self._specialists.create_timesheet(
+                    sp, context, self._timesheet_template_id
+                )
+                created_count += 1
+
+        if created_count > 0:
+            self._specialists.update_timesheet_ids(project_id, "Team", specialists)
+
         for sp in specialists:
             if not sp.timesheet:
                 continue
+            import_formula = self._formulas.get_import_timesheet_formula(
+                sp.timesheet
+            )
             if project.report_spreadsheet_id:
+                self._projects.add_specialist_to_report(
+                    project.report_spreadsheet_id, sp, import_formula
+                )
                 self._projects.sync_rates_to_current_period(
                     project.report_spreadsheet_id, sp
                 )
             if project.calculations_spreadsheet_id:
+                self._projects.add_specialist_to_report(
+                    project.calculations_spreadsheet_id, sp, import_formula
+                )
                 self._projects.sync_rates_to_current_period(
                     project.calculations_spreadsheet_id, sp
                 )
-            updated_count += 1
 
-        log.info(
-            "Synced rates for %d specialists",
-            updated_count,
-        )
+        updated_count = sum(1 for sp in specialists if sp.timesheet)
+        log.info("Synced rates for %d specialists", updated_count)
         return specialists, updated_count

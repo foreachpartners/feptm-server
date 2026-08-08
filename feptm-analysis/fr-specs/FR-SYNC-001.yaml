@@ -1,0 +1,32 @@
+id: FR-SYNC-001
+title: End-to-end specialist sync — timesheet creation, ID linking, and rate propagation
+description: |
+  The system performs a complete specialist sync lifecycle: lists specialists
+  from the Team sheet, creates personal timesheets for new specialists, writes
+  timesheet IDs back to the Team sheet, adds specialists to Current Period
+  sheets in report/calculation spreadsheets, and propagates rate changes.
+
+  Each step must complete correctly before the next can function. Missing
+  timesheet IDs in the Team sheet block rate sync and report population.
+priority: must
+
+acceptance_criteria:
+  - "After sync creates timesheets for new specialists, timesheet IDs are written back to the Team sheet Timesheet column for every newly created specialist, regardless of how many pre-existing timesheet holders are already present."
+  - "Re-running sync does not create duplicate timesheets for specialists who already have a timesheet ID in the Team sheet."
+  - "Running rate sync for a project where no prior sync was performed auto-creates timesheets for specialists without them, writes IDs back, then propagates rates to Current Period sheets."
+  - "Sync correctly processes specialists with empty, invalid, or locale-specific date formats without stopping the pipeline for valid rows."
+  - "Sync correctly processes specialists with empty, invalid, or locale-specific rate values by using a default rate of 0 without stopping the pipeline."
+  - "The sync pipeline does not skip the ID write-back step when the number of newly created timesheets differs from the pre-existing count."
+  - "Running sync with no specialist changes produces zero net modifications to the Team sheet, report spreadsheets, or calculation spreadsheets."
+
+implements:
+  - src/feptm/api/v1/projects.py::sync_project_specialists
+  - src/feptm/api/v1/projects.py::sync_project_rates
+  - src/feptm/models/specialist.py
+  - src/feptm/timesheets/project_service.py
+  - src/feptm/timesheets/config_service.py
+  - src/feptm/storage/specialist_storage.py
+
+revision_history:
+  - "v1 (2026-08-08, commit TBD): initial spec — captured uncovered sync lifecycle gap. Timesheet IDs were not written back to Team sheet when all specialists were new (update_timesheet_ids gated on existing_count instead of newly created count). Rate sync had no auto-timesheet creation path."
+  - "v2 (2026-08-08, WF-1 fix): fix update_timesheet_ids guard — compute new_count from specialists without timesheets instead of reusing existing_count from list_from_sheet. Add auto-timesheet creation to sync_project_rates so rate sync is self-sufficient when run before initial sync."

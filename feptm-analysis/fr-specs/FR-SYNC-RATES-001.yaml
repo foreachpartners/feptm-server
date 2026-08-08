@@ -30,3 +30,4 @@ revision_history:
   - "v1 (2026-08-08, commit TBD): initial FR spec — specialist rates defined in Specialist model, read from Team sheet and written to Current Period sheets during /api/projects/sync."
   - "v2 (2026-08-08, WF-1): added POST /api/projects/sync-rates endpoint — re-reads rates from Team sheet and propagates to report/calculation spreadsheets independently of full sync."
   - "v3 (2026-08-08, WF-1 fix): update_current_period was append-only — existing specialists skipped when re-syncing rates. Added sync_rates_to_current_period method that finds existing row and overwrites rate columns via _write_specialist_fields, preserving column formulas."
+  - "v4 (2026-08-08, WF-1): rate sync depends on timesheet IDs in Team sheet — created FR-SYNC-001 to own the full sync lifecycle (timesheet creation, ID write-back, auto-creation before rate sync)."

@@ -3,6 +3,7 @@ role: service
 requirements:
   - FR-PAYMENT-001
   - FR-SPECIALIST-001
+  - FR-SYNC-001
   - FR-SYNC-RATES-001
 ports:
   http: 8000
