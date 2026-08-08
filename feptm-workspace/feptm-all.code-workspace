@@ -1,0 +1,8 @@
+{
+  "folders": [
+    { "path": "../feptm-server" },
+    { "path": "../feptm-analysis" },
+    { "path": "." }
+  ],
+  "settings": {}
+}

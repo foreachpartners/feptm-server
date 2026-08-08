@@ -1,0 +1,44 @@
+id: "AR-WRITING-001"
+title: "LLM-Oriented Writing Style"
+scope: [all]
+always_apply: true
+context: ""
+
+requirements:
+  - "Use imperative, directive language: 'Load ENV at startup.' not 'First, we''ll load ENV...'."
+  - "Prioritize clarity over brevity; brevity over all else."
+  - "Use MUST for mandatory rules, SHOULD for recommended, MAY for optional, DO NOT for prohibited."
+  - "Fix all ERR findings from the llm-writing check before publishing."
+  - "Fix all WARN findings from the llm-writing check before publishing."
+
+prohibitions:
+  - "Motivational phrases: 'Great job!', 'Perfect!', 'Excellent!'."
+  - "Uncertainty markers: 'maybe', 'perhaps', 'I think'."
+  - "Filler words: 'basically', 'essentially', 'actually'."
+  - "Apologies: 'sorry', 'unfortunately'."
+  - "Conversational check-ins: 'Make sense?', 'Got it?'."
+  - "Subjective qualifiers: 'elegant', 'beautiful', 'clean'."
+  - "Non-English text in rules and documentation."
+
+checks:
+  llm-writing:
+    type: python
+    severity: warn
+    aspect: docs
+    module: llm_writing
+
+  no-cyrillic:
+    type: regex
+    severity: error
+    aspect: docs
+    description: "Non-English text in requirements and documentation"
+    files: "fr-specs/**/*.{yaml,md}"
+    exclude_lines:
+      - '^\s*#'
+      - 'AR-WRITING-001:allow'
+      - '^\s*source:'
+    negative:
+      - pattern: '[\u0400-\u04FF]'
+        message: "Cyrillic text detected - requirements and FR documentation must be in English"
+
+enforcement: []

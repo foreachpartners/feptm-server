@@ -1,0 +1,17 @@
+# feptm naming convention.
+#
+# Single source for cross-cutting identifier derivation. Read by `fep-sdd
+# generate` to derive every identifier from a single short name per repo.
+
+naming:
+  service:
+    repo_dir: "feptm-{name}"
+    crate: "feptm-{name}"
+    binary: "feptm-{name}"
+    config_prefix: "FEPTM_{NAME}__"
+
+  analysis:
+    repo_dir: "feptm-{name}"
+
+  workspace:
+    repo_dir: "feptm-{name}"

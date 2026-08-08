@@ -1,0 +1,58 @@
+id: "AR-WORKSPACE-001"
+title: "Workspace Overview"
+scope: [all]
+always_apply: true
+context: ""
+
+requirements:
+  - "Treat feptm-workspace/README.md as the single source of truth for workspace structure."
+  - "Architecture: single backend service (FastAPI) backed by Google Sheets as the data store, behind nginx reverse proxy."
+  - "Tech stack: Python 3.12+, FastAPI 0.110+, Google Sheets API v4, OAuth 2.0, uv package manager, uvicorn ASGI server, Ubuntu 24.04 LTS, nginx, systemd."
+  - "Sibling repos that compose the project, each conceptually a separate repo: feptm-server (backend service), feptm-analysis (specs + workflows + docs), feptm-workspace (skills + settings + scripts)."
+  - "Local ports: backend HTTP :8000."
+  - "Audit and context CLI live in fep-sdd; consume via feptm-workspace/scripts/sdd-cli.sh wrapper."
+
+prohibitions:
+  - "Duplicate workspace structure information — link to feptm-workspace/README.md instead."
+  - "Hardcode absolute paths in scripts — resolve from $0 or use workspace-relative paths."
+
+task_patterns:
+  - keywords: [audit, verify, check, review]
+    files: []
+    skip: true
+  - keywords: [document, docs, readme, status]
+    files: ["**/*.md"]
+    skip: true
+
+checks:
+  gitignore-essentials:
+    type: regex
+    severity: warn
+    aspect: build
+    description: "Common .gitignore patterns required in all repos"
+    files: ".gitignore"
+    positive:
+      - pattern: '\.env'
+        message: ".gitignore missing .env* pattern"
+      - pattern: '\.DS_Store'
+        message: ".gitignore missing .DS_Store"
+    skip_if:
+      file_missing: ".gitignore"
+
+  gitignore-python:
+    type: regex
+    severity: warn
+    aspect: build
+    description: "Python-specific .gitignore patterns"
+    files: ".gitignore"
+    positive:
+      - pattern: '__pycache__'
+        message: ".gitignore missing __pycache__"
+      - pattern: '\.venv'
+        message: ".gitignore missing .venv"
+      - pattern: '\.pytest_cache'
+        message: ".gitignore missing .pytest_cache"
+    skip_if:
+      repo_role_not: [service]
+
+enforcement: []

@@ -1,0 +1,21 @@
+# Role templates — maps repo roles to applicable AR-spec IDs.
+#
+# always_apply specs (AR-WRITING-001, AR-SECRETS-001, AR-WORKSPACE-001,
+# AR-LINEAGE-001, AR-LINEAGE-002) attach to every repo regardless of role
+# and are NOT listed here.
+
+roles:
+  service:
+    description: "Backend service (Python/FastAPI). The feptm-server monolith."
+    rules: []
+    audit: []
+
+  analysis:
+    description: "Specs and requirements home. AR/FR specs live here."
+    rules: []
+    audit: []
+
+  workspace:
+    description: "Agent harness: skills, settings, scripts."
+    rules: []
+    audit: []

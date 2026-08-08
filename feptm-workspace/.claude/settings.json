@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Edit(./../**)",
+      "Read(./../**)",
+      "Read(~/.claude/**)",
+      "Bash(chmod *)",
+      "Bash(./scripts/sdd-cli.sh *)",
+      "Bash(./scripts/check-codegen-drift.sh *)",
+      "Bash(cat *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(ls *)"
+    ],
+    "additionalDirectories": [
+      "../feptm-analysis",
+      "../feptm-server"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+id: "AR-LINEAGE-002"
+title: "Commit Message Format"
+scope: [all]
+always_apply: true
+context: ""
+
+requirements:
+  - "Format commit messages as `{type}(scope): message [ID]` or `{type}(scope): message [ID, ID, ...]` where each ID is `FR-{CATEGORY}-{NNN}` or `AR-{CATEGORY}-{NNN}`."
+  - "Every behavioral change commit (feat, fix, refactor) MUST include at least one requirement ID in brackets at the end of the subject line."
+  - "Use conventional commit types: feat, fix, refactor, test, docs, chore, ci."
+  - "Scope MUST match the affected repo or module name."
+  - "Use a comma + single space (`, `) to separate multiple IDs inside one bracket: `[FR-CART-001, AR-LINT-001]`."
+
+prohibitions:
+  - "Behavioral commits (feat, fix, refactor) without a requirement ID reference."
+  - "Requirement IDs outside brackets or not at the end of the subject line."
+  - "Multiple bracket blocks on one subject. Always combine IDs into a single comma-separated bracket."
+
+checks:
+  commit-id-format:
+    type: command
+    tier: full
+    severity: warn
+    aspect: lineage
+    description: "Recent behavioral commits must end with [FR-... | AR-...] using comma+space separators."
+    command: 'bad=$(git log -10 --pretty=%s | grep -E "^(feat|fix|refactor)" | grep -vE "\[(FR|AR)-[A-Z][A-Z0-9_]+-[0-9]{3}(, (FR|AR)-[A-Z][A-Z0-9_]+-[0-9]{3})*\]$" || true); if [ -n "$bad" ]; then echo "$bad"; exit 1; fi'
+    timeout: 30
+
+enforcement: []

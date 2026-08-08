@@ -1,0 +1,18 @@
+id: "AR-LINEAGE-001"
+title: "@req Annotation Format"
+scope: [all]
+always_apply: true
+context: ""
+
+requirements:
+  - "Annotate with `@req {TYPE}-{CATEGORY}-{NNN}[, {TYPE}-{CATEGORY}-{NNN}]*` where TYPE is FR or AR."
+  - "Place `@req` as `# @req FR-*` comment on the line directly above the function/class definition in Python."
+  - "Annotate every REST handler function (e.g., FastAPI route handler) that implements a requirement."
+  - "Annotate at the contract boundary: handler implementation."
+
+prohibitions:
+  - "@req in service/business logic layer functions (traced through handler)."
+  - "@req in repository / storage layer functions (infrastructure, traced through handler)."
+  - "@req on shared utility functions unless the utility exists solely for one requirement."
+
+enforcement: []
