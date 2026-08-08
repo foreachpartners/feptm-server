@@ -1,0 +1,31 @@
+id: FR-PAYMENT-001
+title: Close payment periods and archive reports
+description: |
+  The system accepts project_id, period_name, start_date, and end_date and
+  closes work entries with an empty Payment Period within the inclusive date
+  range. For the closed period, the system creates calculation snapshots in
+  General Expenses and Payment Distribution.
+
+  Hours, rates, amounts, and totals in archived tabs are fixed and protected.
+  Payment Status cells remain available to the Project Manager for recording
+  payment after the period is closed.
+
+priority: must
+
+acceptance_criteria:
+  - "The system accepts project_id, a non-empty period_name, and an inclusive start_date–end_date range."
+  - "The system includes only entries whose Payment Period is empty and whose Date is between start_date and end_date, inclusive."
+  - "In each specialist's personal timesheet, the system writes period_name to the Payment Period column of every included entry."
+  - "If there are no matching entries, the system does not create archived tabs or modify timesheets or Current period."
+  - "The system creates copies of Current period named period_name in General Expenses and Payment Distribution."
+  - "Archived tabs contain fully recalculated hours, rates, amounts, and totals for the included entries, with formulas replaced by their values."
+  - "Changes to source hours or rates after closure do not change archived values."
+  - "In archived tabs and specialist timesheets, the system creates strict Protected Ranges for all cells except payment status cells defined by the templates; only the document owner can edit protected cells."
+  - "Current period continues to include entries with an empty Payment Period, and a repeated request creates no duplicates and completes only missing closure operations."
+
+implements:
+  - src/feptm/api/v1/periods.py::close_payment_period
+  - src/feptm/models/payment_period.py
+  - src/feptm/timesheets/project_service.py
+  - src/feptm/timesheets/config_service.py
+  - src/feptm/services/google_sheets_service.py
