@@ -7,7 +7,11 @@
 roles:
   service:
     description: "Backend service (Python/FastAPI). The feptm-server monolith."
-    rules: []
+    rules:
+      - AR-ARCH-001
+      - AR-ARCH-002
+      - AR-ARCH-003
+      - AR-ARCH-004
     audit: []
 
   analysis:

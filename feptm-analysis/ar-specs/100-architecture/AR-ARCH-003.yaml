@@ -1,0 +1,74 @@
+id: "AR-ARCH-003"
+title: "Service Layer Boundaries"
+scope: [service]
+always_apply: false
+context: ""
+
+requirements:
+  - "TimesheetProjectService MUST be a thin facade — orchestration only, ≤200 lines. All spreadsheet manipulation MUST be delegated to storage classes."
+  - "SpecialistService MUST be a thin facade — orchestration only, ≤150 lines. All sheet reading/writing MUST be delegated to storage classes."
+  - "ConfigService MUST be a thin facade — formula lookups delegated to ConfigStorage, enums remain as domain constants."
+  - "The api/ layer MUST contain only: request validation, service orchestration calls, and response formatting. Zero business logic."
+  - "Specialist tab creation, row insertion, formula assignment, and formatting copy MUST live in ProjectStorage or SpecialistStorage — never in the facade."
+  - "Specialist parsing (headers map, row-to-Specialist conversion) MUST live in SpecialistStorage — never in the facade."
+
+prohibitions:
+  - "Api handlers calling storage classes directly — always route through a service facade."
+  - "Api handlers performing spreadsheet operations (creating sheets, writing ranges, syncing data)."
+  - "Storage classes calling other storage classes — cross-storage orchestration is the facade's responsibility."
+  - "Facade methods that span more than 30 lines — extract into a dedicated method on the appropriate storage class."
+
+checks:
+  facade-max-lines:
+    type: command
+    severity: warn
+    aspect: architecture
+    description: "TimesheetProjectService facade must not exceed 200 lines"
+    command: 'lines=$(python3 -c "
+import ast, sys
+try:
+    with open(\"src/feptm/timesheets/project_service.py\") as f:
+        tree = ast.parse(f.read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == \"TimesheetProjectService\":
+            print(node.end_lineno - node.lineno + 1 if node.end_lineno else 0)
+            sys.exit(0)
+    print(0)
+except Exception:
+    print(0)
+"); if [ "$lines" -gt 200 ]; then echo "TimesheetProjectService is $lines lines (limit: 200)"; exit 1; fi'
+    timeout: 10
+
+  specialist-facade-max-lines:
+    type: command
+    severity: warn
+    aspect: architecture
+    description: "SpecialistService facade must not exceed 150 lines"
+    command: 'lines=$(python3 -c "
+import ast, sys
+try:
+    with open(\"src/feptm/timesheets/specialist_service.py\") as f:
+        tree = ast.parse(f.read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == \"SpecialistService\":
+            print(node.end_lineno - node.lineno + 1 if node.end_lineno else 0)
+            sys.exit(0)
+    print(0)
+except Exception:
+    print(0)
+"); if [ "$lines" -gt 150 ]; then echo "SpecialistService is $lines lines (limit: 150)"; exit 1; fi'
+    timeout: 10
+
+  no-business-logic-in-api:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "API handlers must not contain business logic"
+    files: "src/feptm/api/**/*.py"
+    exclude_lines:
+      - 'AR-ARCH-003:allow'
+    negative:
+      - pattern: '(update_range|batch_update|create_spreadsheet|copy_spreadsheet|ensure_spreadsheet|update_sheet_data|get_sheet_data_with_headers|create_drive_folder)'
+        message: "Spreadsheet operation in API handler — move to service/storage layer"
+
+enforcement: []

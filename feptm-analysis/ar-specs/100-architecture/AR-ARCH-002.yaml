@@ -1,0 +1,63 @@
+id: "AR-ARCH-002"
+title: "Dependency Injection"
+scope: [service]
+always_apply: false
+context: ""
+
+requirements:
+  - "All service classes MUST receive their dependencies via constructor arguments — never via module-level imports of singletons."
+  - "All storage class dependencies MUST be received via constructor arguments — never via module-level imports of singletons."
+  - "Stateful objects (services, storage classes, API clients) MUST NOT be instantiated at module level."
+  - "API handlers MUST obtain service instances via FastAPI Depends() or an explicit factory function in a dependencies module."
+  - "Configuration values (template IDs, folder IDs) MUST be injected into services at construction time, not read from a global settings object inside business logic methods."
+  - "The application composition root (where dependencies are wired together) MUST live in a single module: src/feptm/dependencies.py."
+
+prohibitions:
+  - "Module-level instantiation of stateful classes: ServiceClass() or StorageClass() at file scope outside of a dedicated factory function."
+  - "Module-level singleton assignment: service = GoogleSheetsService() in any module."
+  - "Business logic reading settings.GOOGLE_* environment variables directly — inject these values through the constructor."
+  - "Services importing each other at module level (avoid circular dependency via constructor injection)."
+
+checks:
+  no-module-singletons:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Stateful objects must not be instantiated at module level"
+    files: "src/feptm/**/*.py"
+    exclude_files:
+      - "tests/**"
+      - "src/feptm/__init__.py"
+    exclude_lines:
+      - 'AR-ARCH-002:allow'
+      - '^\s*#'
+      - '^\s*log\s*=\s*'
+      - '^\s*settings\s*=\s*'
+      - 'if __name__'
+      - 'Protocol\):'
+      - 'Protocol\['
+    negative:
+      - pattern: '^\w+\s*=\s*(GoogleSheetsService|TimesheetProjectService|SpecialistService|ConfigService)\(\)'
+        message: "Module-level service singleton — inject through constructor instead"
+
+  no-settings-in-business-logic:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Business logic must not read settings.GOOGLE_* directly"
+    files: "src/feptm/{timesheets,storage}/**/*.py"
+    exclude_lines:
+      - 'AR-ARCH-002:allow'
+    negative:
+      - pattern: 'settings\.GOOGLE_'
+        message: "Direct settings.GOOGLE_* access in business logic — inject config values through constructor"
+
+  dependencies-module-exists:
+    type: file_exists
+    severity: error
+    aspect: architecture
+    description: "Composition root must exist at src/feptm/dependencies.py"
+    required:
+      - "src/feptm/dependencies.py"
+
+enforcement: []
