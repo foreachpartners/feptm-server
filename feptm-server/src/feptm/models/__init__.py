@@ -11,7 +11,7 @@ from feptm.models.specialist import Specialist
 __all__ = [
     "Project",
     "ProjectMetaResponse",
-    "Specialist",
     "ProjectSyncRequest",
     "ProjectSyncResponse",
+    "Specialist",
 ]

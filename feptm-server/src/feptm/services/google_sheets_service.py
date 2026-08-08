@@ -1,10 +1,8 @@
 """Service for working with Google Sheets API."""
 
 import json
-import os
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, cast
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials as UserCredentials
@@ -30,8 +28,8 @@ class GoogleSheetsService:
             settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
         )
 
-        self.sheets_service: Optional[Resource] = None
-        self.drive_service: Optional[Resource] = None
+        self.sheets_service: Resource | None = None
+        self.drive_service: Resource | None = None
         self.initialize()
 
     def _find_credentials_file(self) -> str:
@@ -80,12 +78,12 @@ class GoogleSheetsService:
             return True
 
         except Exception as e:
-            log.error(f"Error initializing Google services: {str(e)}")
+            log.error(f"Error initializing Google services: {e!s}")
             self.drive_service = None
             self.sheets_service = None
             return False
 
-    def _get_credentials(self) -> Optional[UserCredentials]:
+    def _get_credentials(self) -> UserCredentials | None:
         """Get OAuth credentials for Google API.
 
         Returns:
@@ -106,7 +104,7 @@ class GoogleSheetsService:
                     json.loads(token_path.read_text()), scopes
                 )
             except Exception as e:
-                log.error(f"Error loading token file: {str(e)}")
+                log.error(f"Error loading token file: {e!s}")
 
         # If there are no valid credentials, let the user log in
         if not creds or not creds.valid:
@@ -136,9 +134,9 @@ class GoogleSheetsService:
             )
             log.info(f"Saved credentials to {token_path}")
 
-        return cast(Optional[UserCredentials], creds)
+        return cast(UserCredentials | None, creds)
 
-    def create_spreadsheet(self, title: str) -> Dict[str, str]:
+    def create_spreadsheet(self, title: str) -> dict[str, str]:
         """Create a new Google Sheets spreadsheet.
 
         Args:
@@ -174,7 +172,7 @@ class GoogleSheetsService:
 
     def get_sheet_by_name(
         self, spreadsheet_id: str, sheet_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Finds a sheet in the spreadsheet by its name.
 
         Args:
@@ -219,15 +217,15 @@ class GoogleSheetsService:
                 )
                 return None
 
-            return cast(Dict[str, Any], target_sheet)
+            return cast(dict[str, Any], target_sheet)
 
         except Exception as error:
             log.error(f"Error getting sheet by name: {error}")
             return None
 
     def create_drive_folder(
-        self, folder_name: str, parent_folder_id: Optional[str] = None
-    ) -> Dict[str, str]:
+        self, folder_name: str, parent_folder_id: str | None = None
+    ) -> dict[str, str]:
         """Create a folder in Google Drive.
 
         Args:
@@ -241,7 +239,7 @@ class GoogleSheetsService:
             raise Exception("Drive service not initialized")
 
         # Prepare folder metadata
-        folder_metadata: Dict[str, Any] = {
+        folder_metadata: dict[str, Any] = {
             "name": folder_name,
             "mimeType": "application/vnd.google-apps.folder",
         }
@@ -267,7 +265,7 @@ class GoogleSheetsService:
 
     def copy_spreadsheet_from_template(
         self, template_id: str, new_title: str, folder_id: str
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Copy a spreadsheet from a template and move it to a folder.
 
         Args:
@@ -317,7 +315,7 @@ class GoogleSheetsService:
 
     def ensure_spreadsheet_from_template(
         self, template_id: str, new_title: str, folder_id: str
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Verifies a template exists and creates a spreadsheet from it.
 
         This method checks if the template exists, handles potential errors,
@@ -352,7 +350,7 @@ class GoogleSheetsService:
                 )
             raise Exception(f"Failed to create spreadsheet from template: {error}")
 
-    def get_file(self, file_id: str) -> Dict[str, Any]:
+    def get_file(self, file_id: str) -> dict[str, Any]:
         """Get file information from Google Drive.
 
         Args:
@@ -370,7 +368,7 @@ class GoogleSheetsService:
                 .get(fileId=file_id, fields="id,name,mimeType,parents")
                 .execute()
             )
-            return cast(Dict[str, Any], result)
+            return cast(dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to get file with ID {file_id}: {error}")
 
@@ -453,9 +451,9 @@ class GoogleSheetsService:
         self,
         spreadsheet_id: str,
         range_name: str,
-        values: List[List[Any]],
+        values: list[list[Any]],
         value_input_option: str = "RAW",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update a range in a Google Sheet.
 
         Args:
@@ -482,13 +480,13 @@ class GoogleSheetsService:
                 )
                 .execute()
             )
-            return cast(Dict[str, Any], result)
+            return cast(dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to update range {range_name}: {error}")
 
     def update_sheet_data(
-        self, spreadsheet_id: str, sheet_name: str, data: List[List[Any]]
-    ) -> Dict[str, Any]:
+        self, spreadsheet_id: str, sheet_name: str, data: list[list[Any]]
+    ) -> dict[str, Any]:
         """Update a sheet with data.
 
         Args:
@@ -526,13 +524,13 @@ class GoogleSheetsService:
                 value_input_option="USER_ENTERED",
             )
 
-            return cast(Dict[str, Any], response)
+            return cast(dict[str, Any], response)
         except Exception as error:
             raise Exception(f"Failed to update sheet: {error}")
 
     def batch_update(
-        self, spreadsheet_id: str, requests: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, spreadsheet_id: str, requests: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Perform batch update operations on a Google Sheet.
 
         Args:
@@ -551,15 +549,15 @@ class GoogleSheetsService:
                 .batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests})
                 .execute()
             )
-            return cast(Dict[str, Any], result)
+            return cast(dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to batch update spreadsheet: {error}")
 
     # Utility methods for Google Sheets operations
 
     def find_column_index(
-        self, headers: List[str], column_names: List[str]
-    ) -> Optional[int]:
+        self, headers: list[str], column_names: list[str]
+    ) -> int | None:
         """Find column index by possible header names.
 
         Args:
@@ -621,8 +619,8 @@ class GoogleSheetsService:
         return f"{sheet_name}!{start_col}{row}:{end_col}{row}"
 
     def find_specialist_row_index(
-        self, values: List[List], name_col_idx: int, specialist_name: str
-    ) -> Optional[int]:
+        self, values: list[list], name_col_idx: int, specialist_name: str
+    ) -> int | None:
         """Find row index for a specialist by name.
 
         Args:
@@ -640,7 +638,7 @@ class GoogleSheetsService:
 
     def get_sheet_data_with_headers(
         self, spreadsheet_id: str, sheet_name: str, range_format: str
-    ) -> tuple[List[List], List[str]]:
+    ) -> tuple[list[list], list[str]]:
         """Get sheet data along with headers.
 
         Args:
@@ -685,7 +683,3 @@ class GoogleSheetsService:
             True if both drive and sheets services are initialized, False otherwise
         """
         return self.drive_service is not None and self.sheets_service is not None
-
-
-# Create singleton instance
-google_sheets_service = GoogleSheetsService()

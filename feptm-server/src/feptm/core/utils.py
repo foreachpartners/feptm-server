@@ -3,10 +3,6 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional
-
-from feptm.core.config import settings
-from feptm.core.log import log
 
 
 def generate_uuid() -> str:
@@ -48,7 +44,7 @@ def format_date_range(start_date: datetime, end_date: datetime) -> str:
         return f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
 
 
-def parse_decimal_safely(value: str, default: Decimal = Decimal("0")) -> Decimal:
+def parse_decimal_safely(value: str, default: Decimal = Decimal(0)) -> Decimal:
     """Parse string to Decimal safely.
 
     Args:
@@ -69,7 +65,7 @@ def parse_decimal_safely(value: str, default: Decimal = Decimal("0")) -> Decimal
         return default
 
 
-def parse_date_safely(value: str, date_format: str) -> Optional[datetime]:
+def parse_date_safely(value: str, date_format: str) -> datetime | None:
     """Parse string to datetime safely.
 
     Args:
@@ -88,7 +84,7 @@ def parse_date_safely(value: str, date_format: str) -> Optional[datetime]:
         return None
 
 
-def clean_string_value(value: str) -> Optional[str]:
+def clean_string_value(value: str) -> str | None:
     """Clean and validate string value.
 
     Args:
@@ -104,7 +100,7 @@ def clean_string_value(value: str) -> Optional[str]:
     return cleaned if cleaned else None
 
 
-def validate_required_fields(data: dict, required_fields: List[str]) -> List[str]:
+def validate_required_fields(data: dict, required_fields: list[str]) -> list[str]:
     """Validate that required fields are present and not empty.
 
     Args:
@@ -136,7 +132,7 @@ def generate_timesheet_title(specialist_name: str, project_name: str) -> str:
     return f"Time Tracking for {specialist_name}. Project {project_name}"
 
 
-def extract_id_from_hyperlink_formula(formula: str) -> Optional[str]:
+def extract_id_from_hyperlink_formula(formula: str) -> str | None:
     """Extract ID from Google Sheets HYPERLINK formula.
 
     Args:

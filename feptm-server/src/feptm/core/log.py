@@ -2,7 +2,6 @@
 
 import logging
 import sys
-from typing import Optional
 
 from feptm.core.config import settings
 
@@ -12,7 +11,7 @@ DEFAULT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def setup_logging(
-    level: Optional[int] = None,
+    level: int | None = None,
     format_str: str = DEFAULT_FORMAT,
     date_format: str = DEFAULT_DATE_FORMAT,
 ) -> None:

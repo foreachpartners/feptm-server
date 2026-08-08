@@ -98,6 +98,7 @@ filename = "src/*.py"
 
 [dependency-groups]
 dev = [
+	"ruff>=0.11.0",
     "black>=25.1.0",
     "flake8>=7.2.0",
     "flake8-pyproject>=1.2.3",

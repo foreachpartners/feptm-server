@@ -2,9 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 
-from pydantic import Field, root_validator, validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,47 +25,47 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
-    API_KEY: Optional[str] = None
+    API_KEY: str | None = None
 
     # Google API settings
-    GOOGLE_CREDENTIALS_FILE: Optional[Path] = (
+    GOOGLE_CREDENTIALS_FILE: Path | None = (
         Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
         if (
             Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
         ).exists()
         else None
     )
-    GOOGLE_TOKEN_FILE: Optional[Path] = (
+    GOOGLE_TOKEN_FILE: Path | None = (
         Path(os.environ.get("HOME", os.path.expanduser("~")))
         / ".google_sheets_token.json"
     )
 
-    GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
-    GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
+    GOOGLE_TIMESHEET_TEMPLATE_ID: str | None = None
+    GOOGLE_REPORT_TEMPLATE_ID: str | None = None
 
     # Config sheet ID for formulas
-    GOOGLE_CONFIG_SHEET_ID: Optional[str] = None
+    GOOGLE_CONFIG_SHEET_ID: str | None = None
 
     # Google Drive settings for projects
     # Important: make sure all these files are accessible to the user
     # authenticated via OAuth (enable "Share by link" access)
-    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = (
+    GOOGLE_PROJECTS_FOLDER_ID: str | None = (
         None  # Specify the Google Drive folder ID here
     )
 
     # Google Sheets templates - specify your identifiers here or update environment variables
     # To make templates accessible, "Share by link" must be enabled for them (Share > General Access)
-    GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None
-    GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None
-    GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: Optional[str] = None
+    GOOGLE_PROJECT_INFO_TEMPLATE_ID: str | None = None
+    GOOGLE_PROJECT_REPORT_TEMPLATE_ID: str | None = None
+    GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: str | None = None
 
     # Model configurations
     SPECIALIST_ROLES: list[str] = Field(
         default=["Developer", "QA", "Designer", "Project Manager", "DevOps"]
     )
 
-    @root_validator(pre=True)
-    def expand_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    @model_validator(mode='before')
+    def expand_all_paths(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Process all Path fields, expanding tildes and converting to Path type."""
         for field_name, field_value in values.items():
             if isinstance(field_value, str) and "~" in field_value:

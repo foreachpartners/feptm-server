@@ -1,7 +1,6 @@
 """Context objects for business operations."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass

@@ -1,25 +1,23 @@
 """API endpoints for projects."""
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from feptm.core.config import settings
+from feptm.dependencies import get_timesheet_project_service
 from feptm.models import (
-    Project,
     ProjectMetaResponse,
     ProjectSyncRequest,
     ProjectSyncResponse,
-    Specialist,
 )
-from feptm.services.google_sheets_service import google_sheets_service
 from feptm.timesheets.project_service import TimesheetProjectService
 
 router = APIRouter()
 
 
 class ProjectCreateRequest(BaseModel):
-    """Request model for creating a project."""
-
     project_name: str = Field(
         ..., min_length=1, description="Project name cannot be empty"
     )
@@ -27,119 +25,95 @@ class ProjectCreateRequest(BaseModel):
 
 @router.post("/create", response_model=ProjectMetaResponse)
 async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
-    """Create a new project in Google Drive.
-
-    This endpoint creates:
-    1. A folder in Google Drive with the project name
-    2. A Google Sheet with project info based on the template
-    3. A report file linked to the project info
-    4. A calculations sheet for the project
-
-    Args:
-        request: Project creation request containing project name
-
-    Returns:
-        Project creation response with IDs and URLs
-
-    Raises:
-        HTTPException: If creation fails
-    """
     try:
-        # Validate configuration
-        if not settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID:
+        info_id = settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID
+        report_id = settings.GOOGLE_PROJECT_REPORT_TEMPLATE_ID
+        calc_id = settings.GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID
+
+        missing = []
+        if not info_id:
+            missing.append("GOOGLE_PROJECT_INFO_TEMPLATE_ID")
+        if not report_id:
+            missing.append("GOOGLE_PROJECT_REPORT_TEMPLATE_ID")
+        if not calc_id:
+            missing.append("GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID")
+        if missing:
             raise HTTPException(
                 status_code=500,
-                detail="GOOGLE_PROJECT_INFO_TEMPLATE_ID not configured. Please set this value in the environment variables.",
+                detail=f"Missing configuration: {', '.join(missing)}",
             )
 
-        if not settings.GOOGLE_PROJECT_REPORT_TEMPLATE_ID:
-            raise HTTPException(
-                status_code=500,
-                detail="GOOGLE_PROJECT_REPORT_TEMPLATE_ID not configured. Please set this value in the environment variables.",
-            )
+        service: TimesheetProjectService = get_timesheet_project_service()
 
-        if not settings.GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID:
-            raise HTTPException(
-                status_code=500,
-                detail="GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID not configured. Please set this value in the environment variables.",
-            )
+        result = service.create_project(
+            project_name=request.project_name,
+            template_ids={
+                "info": info_id or "",
+                "report": report_id or "",
+                "calculations": calc_id or "",
+            },
+            parent_folder_id=settings.GOOGLE_PROJECTS_FOLDER_ID,
+        )
 
-        # Create minimal Project with just the name
-        project = Project(name=request.project_name)
+        from feptm.timesheets.config_service import UrlPattern
 
-        # Initialize timesheet project service with the Google Sheets service
-        timesheet_service = TimesheetProjectService(google_sheets_service)
-
-        # Create project in Google Drive
-        result = timesheet_service.create_project(project)
-
-        # Return the response
         return ProjectMetaResponse(
-            created=project.created,
-            modified=project.modified,
+            created=datetime.now(UTC),
+            modified=datetime.now(UTC),
             drive_folder_id=result.get("drive_folder_id", ""),
-            drive_folder_url=result.get("drive_folder_url", ""),
-            project_info_spreadsheet_id=result.get("project_info_spreadsheet_id", ""),
-            project_info_spreadsheet_url=result.get("project_info_spreadsheet_url", ""),
+            drive_folder_url=UrlPattern.DRIVE_FOLDER.format(
+                folder_id=result.get("drive_folder_id", "")
+            )
+            if result.get("drive_folder_id")
+            else None,
+            project_info_spreadsheet_id=result.get("info_spreadsheet_id", ""),
+            project_info_spreadsheet_url=UrlPattern.SPREADSHEET.format(
+                spreadsheet_id=result.get("info_spreadsheet_id", "")
+            )
+            if result.get("info_spreadsheet_id")
+            else None,
             report_spreadsheet_id=result.get("report_spreadsheet_id", ""),
-            report_spreadsheet_url=result.get("report_spreadsheet_url", ""),
+            report_spreadsheet_url=UrlPattern.SPREADSHEET.format(
+                spreadsheet_id=result.get("report_spreadsheet_id", "")
+            )
+            if result.get("report_spreadsheet_id")
+            else None,
             calculations_spreadsheet_id=result.get("calculations_spreadsheet_id", ""),
-            calculations_spreadsheet_url=result.get("calculations_spreadsheet_url", ""),
+            calculations_spreadsheet_url=UrlPattern.SPREADSHEET.format(
+                spreadsheet_id=result.get("calculations_spreadsheet_id", "")
+            )
+            if result.get("calculations_spreadsheet_id")
+            else None,
         )
-    except HTTPException as e:
-        # Re-raise HTTP exceptions
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create project: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {e}")
 
 
 @router.post("/sync", response_model=ProjectSyncResponse)
 async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncResponse:
-    """Synchronize specialists for a project.
-
-    This endpoint:
-    1. Analyzes the project's spreadsheet for specialists information
-    2. Creates timesheets for specialists who don't have them
-    3. Links the timesheets to project reports and calculations
-
-    Args:
-        request: Project sync request containing project ID
-
-    Returns:
-        Project sync response with specialists info
-
-    Raises:
-        HTTPException: If synchronization fails
-    """
     try:
-        # Validate configuration
         if not settings.GOOGLE_TIMESHEET_TEMPLATE_ID:
             raise HTTPException(
                 status_code=500,
-                detail="GOOGLE_TIMESHEET_TEMPLATE_ID not configured. Please set this value in the environment variables.",
+                detail="GOOGLE_TIMESHEET_TEMPLATE_ID not configured.",
             )
 
-        # Initialize timesheet project service
-        timesheet_service = TimesheetProjectService(google_sheets_service)
-
-        # Sync project specialists
-        specialists, total_count, created_count = (
-            timesheet_service.sync_project_specialists(project_id=request.project_id)
+        service: TimesheetProjectService = get_timesheet_project_service()
+        specialists, total, created = service.sync_project_specialists(
+            project_id=request.project_id
         )
 
-        # Return the response
         return ProjectSyncResponse(
             project_id=request.project_id,
-            specialists_found=total_count,
-            specialists_created=created_count,
+            specialists_found=total,
+            specialists_created=created,
             specialists=specialists,
         )
-    except HTTPException as e:
-        # Re-raise HTTP exceptions
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to sync project specialists: {str(e)}"
+            status_code=500, detail=f"Failed to sync project specialists: {e}"
         )
