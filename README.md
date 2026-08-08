@@ -53,3 +53,8 @@ Or using Python directly:
 ```
 python -m bin.run_api
 ```
+
+## Run via uv
+```
+uv run uvicorn feptm.main:app --host 0.0.0.0 --port 8000 --reload
+```
