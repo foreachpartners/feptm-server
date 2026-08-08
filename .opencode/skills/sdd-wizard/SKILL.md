@@ -1,3 +1,8 @@
+---
+name: sdd-wizard
+description: Guided end-to-end SDD feature flow from init to commit
+---
+
 # sdd-wizard — All-in-One Feature Flow
 
 Chains the full SDD pipeline from initiation through commit in one guided flow. This is the recommended entry point for building features.

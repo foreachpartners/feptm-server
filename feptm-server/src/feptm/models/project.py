@@ -60,3 +60,18 @@ class ProjectSyncResponse(BaseModel):
     specialists_found: int
     specialists_created: int
     specialists: list[Specialist]
+
+
+class ProjectSyncRatesRequest(BaseModel):
+    """Request model for syncing specialist rates."""
+
+    project_id: str = Field(..., min_length=1, description="Project ID cannot be empty")
+
+
+class ProjectSyncRatesResponse(BaseModel):
+    """Response model for specialist rate sync operation."""
+
+    created: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    project_id: str
+    specialists_updated: int
+    specialists: list[Specialist]

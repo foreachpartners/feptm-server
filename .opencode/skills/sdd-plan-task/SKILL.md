@@ -1,3 +1,8 @@
+---
+name: sdd-plan-task
+description: Create SDD technical plan and task breakdown
+---
+
 # sdd-plan-task — Create SDD Technical Plan
 
 Adapted from `feptm-analysis/docs/skills/plan-task.md`. Reads workflow context, drafts a technical plan, persists `plan.md`, and hard-stops for user review.

@@ -1,3 +1,8 @@
+---
+name: sdd-audit
+description: Run AR-spec audit checks on specified repos
+---
+
 # sdd-audit — Workspace Audit
 
 Adapted from `feptm-analysis/docs/skills/audit.md`. Runs AR-spec audit checks on specified repos.

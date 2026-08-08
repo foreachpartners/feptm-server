@@ -1,3 +1,8 @@
+---
+name: sdd-branch-task
+description: Create feature branch across feptm repos
+---
+
 # sdd-branch-task — Create Feature Branch Across Repos
 
 Adapted from `feptm-analysis/docs/skills/branch-task.md`. Creates a feature branch from `main` across feptm repos.

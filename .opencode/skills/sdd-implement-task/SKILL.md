@@ -1,3 +1,8 @@
+---
+name: sdd-implement-task
+description: Execute SDD implementation tasks in order with verification
+---
+
 # sdd-implement-task — Execute SDD Implementation Plan
 
 Adapted from `feptm-analysis/docs/skills/implement-task.md`. Reads plan and tasks, executes pending tasks in order, verifies each task.

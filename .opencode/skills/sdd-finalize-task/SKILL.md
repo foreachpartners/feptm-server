@@ -1,3 +1,8 @@
+---
+name: sdd-finalize-task
+description: Prepare final commit with verification and archiving
+---
+
 # sdd-finalize-task — Prepare Final Commit
 
 Adapted from `feptm-analysis/docs/skills/finalize-task.md`. Runs final verification, archives plan/tasks, generates commit message.

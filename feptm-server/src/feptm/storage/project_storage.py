@@ -253,6 +253,25 @@ class ProjectStorage:
         )
         log.info("Added %s to %s tab", specialist.name, sheet_name)
 
+    def sync_rates_to_current_period(
+        self,
+        spreadsheet_id: str,
+        specialist: Specialist,
+    ) -> None:
+        sheet_name = SheetName.CURRENT_PERIOD.value
+        sheet_data = self._read_current_period(spreadsheet_id, sheet_name)
+        if not sheet_data:
+            return
+        values, headers, _ = sheet_data
+        target_row = _find_specialist_row(
+            values, headers, specialist.name, self._sheets
+        )
+        if target_row is None:
+            return
+        _write_specialist_fields(
+            self._sheets, spreadsheet_id, sheet_name, target_row, specialist, headers
+        )
+
     def _create_from_template(
         self, template_id: str, new_title: str, folder_id: str
     ) -> dict[str, str]:
@@ -432,6 +451,18 @@ def _specialist_in_sheet(
         if len(row) > idx and row[idx] == name:
             return True
     return False
+
+
+def _find_specialist_row(
+    values: list[list], headers: list[str], name: str, sheets: GoogleSheetsService
+) -> int | None:
+    idx = sheets.find_column_index(headers, [ColumnName.SPECIALIST.value])
+    if idx is None:
+        return None
+    for i, row in enumerate(values[1:], start=2):
+        if len(row) > idx and row[idx] == name:
+            return i
+    return None
 
 
 def _find_insert_position(

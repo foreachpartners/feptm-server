@@ -1,3 +1,8 @@
+---
+name: sdd-verify-task
+description: Run SDD verification checks at init/implement/finalize phases
+---
+
 # sdd-verify-task — SDD Verification Gate
 
 Adapted from `feptm-analysis/docs/skills/verify-task.md`. Runs verification checks at init/implement/finalize phases.

@@ -115,3 +115,43 @@ def test_sync_service_error(mock_get_service, mock_settings, client: TestClient)
 
     response = client.post("/api/projects/sync", json={"project_id": "test-id"})
     assert response.status_code == 500
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_sync_project_rates_success(mock_get_service, client: TestClient):
+    from feptm.models.specialist import Specialist
+
+    sp = Specialist(
+        name="John", role="Dev", internal_rate="100",
+        external_rate="120", timesheet="ts-1",
+    )
+    mock_service = MagicMock()
+    mock_service.sync_project_rates.return_value = ([sp], 1)
+    mock_get_service.return_value = mock_service
+
+    response = client.post(
+        "/api/projects/sync-rates", json={"project_id": "test-project-id"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["specialists_updated"] == 1
+    assert data["project_id"] == "test-project-id"
+    assert len(data["specialists"]) == 1
+    assert data["specialists"][0]["name"] == "John"
+    assert data["specialists"][0]["internal_rate"] == "100"
+    assert data["specialists"][0]["external_rate"] == "120"
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_sync_project_rates_service_error(
+    mock_get_service, client: TestClient,
+):
+    mock_service = MagicMock()
+    mock_service.sync_project_rates.side_effect = Exception("Rate sync failure")
+    mock_get_service.return_value = mock_service
+
+    response = client.post(
+        "/api/projects/sync-rates", json={"project_id": "test-id"}
+    )
+    assert response.status_code == 500

@@ -45,6 +45,14 @@ class ProjectStorageProtocol(Protocol):
         """Add or update a specialist row in the Current Period sheet."""
         ...
 
+    def sync_rates_to_current_period(
+        self,
+        spreadsheet_id: str,
+        specialist: Specialist,
+    ) -> None:
+        """Update rate fields for an existing specialist in the Current Period sheet."""
+        ...
+
 
 class SpecialistStorageProtocol(Protocol):
     """Protocol for specialist-scoped spreadsheet operations."""

@@ -9,6 +9,8 @@ from feptm.core.config import settings
 from feptm.dependencies import get_timesheet_project_service
 from feptm.models import (
     ProjectMetaResponse,
+    ProjectSyncRatesRequest,
+    ProjectSyncRatesResponse,
     ProjectSyncRequest,
     ProjectSyncResponse,
 )
@@ -116,4 +118,28 @@ async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncRe
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to sync project specialists: {e}"
+        )
+
+
+# @req FR-SYNC-RATES-001
+@router.post("/sync-rates", response_model=ProjectSyncRatesResponse)
+async def sync_project_rates(
+    request: ProjectSyncRatesRequest,
+) -> ProjectSyncRatesResponse:
+    try:
+        service: TimesheetProjectService = get_timesheet_project_service()
+        specialists, updated = service.sync_project_rates(
+            project_id=request.project_id
+        )
+
+        return ProjectSyncRatesResponse(
+            project_id=request.project_id,
+            specialists_updated=updated,
+            specialists=specialists,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to sync specialist rates: {e}"
         )

@@ -173,3 +173,88 @@ class TestProjectServiceFacade:
         assert result["drive_folder_id"] == "folder-id"
         assert result["info_spreadsheet_id"] == "info-id"
         mock_sheets.update_sheet_data.assert_called_once()
+
+    def test_sync_project_rates_success(self, project_service, mock_sheets):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            project_info_spreadsheet_id="info-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp1 = Specialist(
+            name="John", role="Dev", internal_rate="100",
+            external_rate="120", timesheet="ts-1",
+        )
+        sp2 = Specialist(
+            name="Jane", role="QA", internal_rate="90",
+            external_rate="110", timesheet="ts-2",
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp1, sp2], 2)
+        )
+
+        mock_update = MagicMock()
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 2
+        assert len(specialists) == 2
+        assert mock_update.call_count == 4
+
+    def test_sync_project_rates_empty_sheet(self, project_service):
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=Project(name="Empty")
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([], 0)
+        )
+
+        specialists, updated = project_service.sync_project_rates("empty-id")
+
+        assert updated == 0
+        assert specialists == []
+
+    def test_sync_project_rates_skips_no_timesheet(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test", report_spreadsheet_id="r-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp = Specialist(
+            name="Bob", role="Dev", internal_rate="50",
+            external_rate="60", timesheet=None,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 0)
+        )
+
+        mock_update = MagicMock()
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        specialists, updated = project_service.sync_project_rates("test-id")
+
+        assert updated == 0
+        assert len(specialists) == 1
+        mock_update.assert_not_called()
+
+    def test_sync_project_rates_missing_metadata(self, project_service):
+        project_service._projects.get_project_metadata = MagicMock(
+            side_effect=Exception("Project not found")
+        )
+
+        with pytest.raises(Exception, match="Project not found"):
+            project_service.sync_project_rates("bad-id")

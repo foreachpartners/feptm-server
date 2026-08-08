@@ -102,3 +102,31 @@ class TimesheetProjectService:
             new_count,
         )
         return specialists, len(specialists), new_count
+
+    def sync_project_rates(
+        self, project_id: str
+    ) -> tuple[list[Specialist], int]:
+        project = self._projects.get_project_metadata(project_id)
+        specialists, _ = self._specialists.list_from_sheet(project_id)
+        if not specialists:
+            return [], 0
+
+        updated_count = 0
+        for sp in specialists:
+            if not sp.timesheet:
+                continue
+            if project.report_spreadsheet_id:
+                self._projects.sync_rates_to_current_period(
+                    project.report_spreadsheet_id, sp
+                )
+            if project.calculations_spreadsheet_id:
+                self._projects.sync_rates_to_current_period(
+                    project.calculations_spreadsheet_id, sp
+                )
+            updated_count += 1
+
+        log.info(
+            "Synced rates for %d specialists",
+            updated_count,
+        )
+        return specialists, updated_count

@@ -1,3 +1,8 @@
+---
+name: sdd-init-task
+description: Initialize SDD workflow context and capture baseline
+---
+
 # sdd-init-task — Initialize SDD Workflow Context
 
 Adapted from `feptm-analysis/docs/skills/init-task.md`. This skill initializes a WF-* workflow directory for the fep-sdd Spec-Driven Development pipeline.

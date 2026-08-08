@@ -1,0 +1,18 @@
+created: '2026-08-08'
+sessions:
+  init: SID-1786213780-293f31bb
+  plan: SID-1786214052-5158a57b
+  plan_fix: SID-1786217373-8695f746
+  implement: SID-1786214444-3c78ac84
+  implement_fix: SID-1786217502-aa4fa8dc
+  finalize: SID-1786214619-fb335b5e
+  finalize_fix: SID-1786217932-6220109b
+description: Update specialist rates configuration for the sync-rates functionality
+fr_ids:
+- FR-SYNC-RATES-001
+repos:
+- feptm-server
+- feptm-analysis
+ceremony: medium
+status: implementing
+baseline_policy: ignore
