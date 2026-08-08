@@ -39,8 +39,7 @@ class Settings(BaseSettings):
         Path(os.environ.get("HOME", os.path.expanduser("~")))
         / ".google_sheets_token.json"
     )
-    GOOGLE_CLIENT_ID: Optional[str] = None
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
     GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
 
