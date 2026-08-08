@@ -1,25 +1,29 @@
 id: FR-SPECIALIST-001
-title: Manage specialist participation in calculations through status
+title: Remove a specialist from future periods through Team
 description: |
-  The user manages a specialist's participation in current calculations through
-  the required Status column with Active and Inactive values. A new specialist
-  is Active by default. When the status changes to Inactive, calculated amounts
-  are frozen, and no new accruals are generated.
+  The user removes a specialist by deleting the specialist's row from the Team
+  sheet.
+
+  Deleting the Team row does not affect the open payment period. The
+  specialist's work remains included in the Current period in which the row was
+  deleted. After that period is closed, the specialist is excluded from the
+  next and subsequent Current periods.
 priority: must
 
 acceptance_criteria:
-  - "The Team sheet contains the required Status column."
-  - "When a specialist is added to Team, Status defaults to Active."
-  - "A row with an empty name, an empty Status, or a Status other than Active or Inactive is skipped during sync without changing related data."
-  - "Team rows with the same name are skipped during sync without changing related data."
-  - "After Status changes from Active to Inactive, the next sync freezes the specialist's calculated amounts in the Current period tabs. The row remains in its original position, displays Inactive in gray text, and remains included in the current period totals, but receives no new accruals during subsequent syncs."
-  - "Changing Status to Inactive does not delete the Team row, personal timesheet, personal tabs, frozen accruals, or closed-period data."
-  - "Repeated sync with unchanged data does not create duplicate timesheets, personal tabs, or report rows."
+  - "The user removes a specialist by deleting the specialist's row from Team."
+  - "Deleting the Team row does not remove or modify the specialist's row in the open Current period."
+  - "All eligible work of the removed specialist is included when the open period is closed."
+  - "The removed specialist remains included in archived reports for periods in which the specialist participated."
+  - "After the open period is closed successfully, the next Current period is formed from the current Team."
+  - "A specialist absent from Team is not included in the next or subsequent Current periods."
+  - "Work of the removed specialist is excluded from calculations starting from the next period."
+  - "Deleting the Team row does not delete the specialist's personal timesheet, personal report tabs, or archived data."
+  - "Repeated sync or period closure does not restore the removed specialist in future Current periods."
 
 implements:
   - src/feptm/api/v1/projects.py::sync_project_specialists
-  - src/feptm/models/specialist.py
+  - src/feptm/api/v1/periods.py::close_payment_period
   - src/feptm/timesheets/specialist_service.py
   - src/feptm/timesheets/project_service.py
-  - src/feptm/timesheets/config_service.py
-  - src/feptm/services/google_sheets_service
+  - src/feptm/services/google_sheets_service.py
