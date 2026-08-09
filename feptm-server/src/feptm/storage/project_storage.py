@@ -546,24 +546,45 @@ class ProjectStorage:
 
         archive = [list(headers)]
         num_cols = len(headers)
+        seen_bases: set[str] = set()
+
+        import re
 
         for row in values[1:]:
             _pad_row(row, num_cols)
             sp_name = row[0] if row else ""
+
             sp = sp_map.get(sp_name)
+            if sp is None:
+                base = re.sub(r"\s+\(\d+\)$", "", sp_name)
+                if base != sp_name:
+                    sp = sp_map.get(base)
 
             if sp is None:
                 archive.append(list(row))
                 continue
 
+            canonical = sp.display_name or sp.name or sp_name
+            base_name = re.sub(r"\s+\(\d+\)$", "", canonical)
+            if base_name in seen_bases:
+                continue
+
+            if canonical != sp_name:
+                sp_name = canonical
+                _pad_row(row, 1)
+                row[0] = canonical
+
             timesheet_id = sp.timesheet or ""
             if not timesheet_id:
                 archive.append(list(row))
                 continue
+
             hours = self._sum_timesheet_hours(timesheet_id, start_date, end_date)
             if hours <= 0:
                 archive.append(list(row))
                 continue
+
+            seen_bases.add(base_name)
 
             cl_rate = float(sp.external_rate)
             sp_rate = float(sp.internal_rate)
@@ -601,6 +622,35 @@ class ProjectStorage:
         )
         log.info("Archived Current Period as %s in spreadsheet", period_name)
         return True
+
+    def _extract_timesheet_id_from_tab(
+        self,
+        spreadsheet_id: str,
+        tab_name: str,
+    ) -> str | None:
+        if not self._sheets.sheets_service:
+            return None
+        try:
+            result = (
+                self._sheets.sheets_service.spreadsheets()
+                .values()
+                .get(
+                    spreadsheetId=spreadsheet_id,
+                    range=f"{tab_name}!A1",
+                    valueRenderOption="FORMULA",
+                )
+                .execute()
+            )
+            vals = result.get("values", [])
+            if not vals or not vals[0]:
+                return None
+            formula = str(vals[0][0])
+            import re
+            m = re.search(r'IMPORTRANGE\s*\(\s*"([^"]+)"', formula)
+            return m.group(1) if m else None
+        except Exception as exc:
+            log.warning("Failed to extract timesheet ID from tab %s: %s", tab_name, exc)
+            return None
 
     def _sum_timesheet_hours(
         self,
@@ -748,6 +798,20 @@ def _find_column_contains(headers: list[str], needle: str) -> int | None:
 def _pad_row(row: list, size: int) -> None:
     while len(row) < size:
         row.append("")
+
+
+def _parse_rate_from_row(
+    row: list, headers: list[str], col_name: str
+) -> float | None:
+    col_idx = _find_column_contains(headers, col_name)
+    if col_idx is None or col_idx >= len(row):
+        return None
+    raw = str(row[col_idx]).replace("$", "").replace("\xa0", "").replace(" ", "")
+    raw = raw.replace(",", ".").replace("€", "")
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return None
 
 
 def _serial_to_date(value: Any) -> datetime | None:
