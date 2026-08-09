@@ -1,0 +1,17 @@
+created: '2026-08-09'
+description: Fix specialist name collision causing duplicate specialists to be silently
+  dropped from reports and Current Period sheets
+fr_ids:
+- FR-SYNC-001
+- FR-SYNC-RATES-001
+repos:
+- feptm-server
+- feptm-analysis
+ceremony: medium
+sessions:
+  init: SID-1786272912-ed437f2b
+  plan: SID-1786273084-270797b6
+  implement: SID-1786274066-76462976
+  finalize: SID-1786274424-08ecc4ec
+baseline_policy: fix_all
+status: implementing

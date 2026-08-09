@@ -88,7 +88,7 @@ class SpecialistStorage:
         specialists: list[Specialist] = []
         existing_count = 0
 
-        for row in values[1:]:
+        for i, row in enumerate(values[1:]):
             name_idx = headers_map["name"]
             role_idx = headers_map["role"]
             if name_idx is None or role_idx is None:
@@ -98,7 +98,7 @@ class SpecialistStorage:
             if not row or len(row) <= max(name_idx, role_idx):
                 continue
 
-            sp = self._parse_row(row, headers_map)
+            sp = self._parse_row(row, headers_map, row_number=i + 2)
             if sp:
                 specialists.append(sp)
                 if sp.timesheet:
@@ -125,7 +125,7 @@ class SpecialistStorage:
             ),
         }
 
-    def _parse_row(self, row: list, hmap: dict[str, int | None]) -> Specialist | None:
+    def _parse_row(self, row: list, hmap: dict[str, int | None], row_number: int | None = None) -> Specialist | None:
         name = (
             row[hmap["name"]].strip()
             if hmap["name"] is not None and hmap["name"] < len(row)
@@ -157,6 +157,7 @@ class SpecialistStorage:
             external_rate=external_rate,
             date=date_val or datetime.utcnow(),
             timesheet=timesheet,
+            row_index=row_number,
         )
 
     def _prepare_updates(
@@ -171,17 +172,15 @@ class SpecialistStorage:
         timesheet_col = self._sheets.find_column_index(
             headers, [ColumnName.TIMESHEET.value]
         )
-        name_col = self._sheets.find_column_index(headers, [ColumnName.NAME.value])
-        if timesheet_col is None or name_col is None:
+        if timesheet_col is None:
             return []
 
         updates: list[tuple[int, str]] = []
         for sp in specialists:
             if not sp.timesheet:
                 continue
-            row_idx = self._sheets.find_specialist_row_index(values, name_col, sp.name)
-            if row_idx is not None:
-                updates.append((row_idx + 1, sp.timesheet))
+            if sp.row_index is not None:
+                updates.append((sp.row_index, sp.timesheet))
         return updates
 
     def _apply_updates(

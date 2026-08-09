@@ -110,9 +110,8 @@ class TestSpecialistStorage:
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
-        mock_sheets.find_specialist_row_index.return_value = 1
 
-        spec = Specialist(name="John Doe", role="Lead Developer", timesheet="new-ts-id")
+        spec = Specialist(name="John Doe", role="Lead Developer", timesheet="new-ts-id", row_index=2)
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [spec])
 
         assert result is True
@@ -129,6 +128,53 @@ class TestSpecialistStorage:
         spec = Specialist(name="John", role="Dev")  # no timesheet
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [spec])
         assert result is True
+
+    def test_parse_rows_sets_row_index(self, specialist_storage, mock_sheets):
+        data = SAMPLE_VALUES
+        headers = SAMPLE_HEADERS
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        specialists, _ = specialist_storage.list_from_sheet("test-id", "Team")
+
+        assert specialists[0].row_index == 2
+        assert specialists[1].row_index == 3
+        assert specialists[2].row_index == 4
+
+    def test_prepare_updates_uses_row_index(self, specialist_storage, mock_sheets):
+        data = SAMPLE_VALUES
+        headers = SAMPLE_HEADERS
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        sp1 = Specialist(name="John Doe", role="Dev", timesheet="ts-a", row_index=2)
+        sp2 = Specialist(name="Jane Smith", role="Designer", timesheet="ts-b", row_index=3)
+
+        result = specialist_storage.update_timesheet_ids("test-id", "Team", [sp1, sp2])
+
+        assert result is True
+        assert mock_sheets.update_range.call_count == 2
+        calls = mock_sheets.update_range.call_args_list
+        assert "Team!G2" == calls[0][1]["range_name"]
+        assert "Team!G3" == calls[1][1]["range_name"]
+
+    def test_prepare_updates_duplicate_names_correct_rows(self, specialist_storage, mock_sheets):
+        headers = ["Name", "Role", "Project", "Internal Rate", "External Rate", "Date", "Timesheet"]
+        data = [
+            headers,
+            ["John Smith", "Dev", "", "100", "120", "", ""],
+            ["John Smith", "QA", "", "80", "100", "", ""],
+        ]
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        sp1 = Specialist(name="John Smith", role="Dev", timesheet="ts-dev", row_index=2)
+        sp2 = Specialist(name="John Smith", role="QA", timesheet="ts-qa", row_index=3)
+
+        result = specialist_storage.update_timesheet_ids("test-id", "Team", [sp1, sp2])
+
+        assert result is True
+        assert mock_sheets.update_range.call_count == 2
+        calls = mock_sheets.update_range.call_args_list
+        assert "Team!G2" == calls[0][1]["range_name"]
+        assert "Team!G3" == calls[1][1]["range_name"]
 
 
 class TestSpecialistServiceFacade:

@@ -206,7 +206,7 @@ class ProjectStorage:
         specialist: Specialist,
         import_formula: str,
     ) -> None:
-        tab_name = specialist.name
+        tab_name = specialist.display_name or specialist.name
         existing = self._list_sheet_titles(spreadsheet_id)
         if tab_name not in existing:
             self._sheets.batch_update(
@@ -234,8 +234,8 @@ class ProjectStorage:
 
         values, headers, sheet = sheet_data
 
-        if _specialist_in_sheet(values, headers, specialist.name, self._sheets):
-            log.info("Specialist %s already exists in Current Period", specialist.name)
+        if _specialist_in_sheet(values, headers, specialist.display_name or specialist.name, self._sheets):
+            log.info("Specialist %s already exists in Current Period", specialist.display_name or specialist.name)
             return
 
         insert_row, should_insert = _find_insert_position(values, headers, self._sheets)
@@ -264,7 +264,7 @@ class ProjectStorage:
             return
         values, headers, _ = sheet_data
         target_row = _find_specialist_row(
-            values, headers, specialist.name, self._sheets
+            values, headers, specialist.display_name or specialist.name, self._sheets
         )
         if target_row is None:
             return
@@ -582,7 +582,7 @@ def _write_specialist_fields(
     headers: list[str],
 ) -> None:
     field_updates = [
-        (ColumnName.SPECIALIST.value, specialist.name),
+        (ColumnName.SPECIALIST.value, specialist.display_name or specialist.name),
         (ColumnName.SPECIALIST_ROLE.value, specialist.role),
         (ColumnName.HOURLY_RATE_USD.value, str(specialist.external_rate)),
         (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(specialist.internal_rate)),

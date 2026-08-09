@@ -1,5 +1,7 @@
 """Service for handling project timesheets and related operations."""
 
+from collections import Counter
+
 from feptm.core.log import log
 from feptm.models.context import TimesheetContext
 from feptm.models.project import Project
@@ -9,6 +11,15 @@ from feptm.storage.protocols import (
     ProjectStorageProtocol,
     SpecialistStorageProtocol,
 )
+
+
+def _resolve_display_names(specialists: list[Specialist]) -> None:
+    name_counts = Counter(sp.name for sp in specialists if sp.name)
+    for sp in specialists:
+        if name_counts.get(sp.name, 0) > 1 and sp.row_index is not None:
+            sp.display_name = f"{sp.name} ({sp.row_index})"
+        else:
+            sp.display_name = sp.name
 
 
 class TimesheetProjectService:
@@ -68,6 +79,8 @@ class TimesheetProjectService:
         if not specialists:
             return [], 0, 0
 
+        _resolve_display_names(specialists)
+
         new_count = 0
         for sp in specialists:
             if not sp.timesheet:
@@ -126,6 +139,8 @@ class TimesheetProjectService:
         specialists, _ = self._specialists.list_from_sheet(project_id)
         if not specialists:
             return [], 0
+
+        _resolve_display_names(specialists)
 
         created_count = 0
         for sp in specialists:

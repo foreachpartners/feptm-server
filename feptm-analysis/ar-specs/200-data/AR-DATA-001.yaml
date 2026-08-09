@@ -1,0 +1,42 @@
+id: "AR-DATA-001"
+title: "Specialist Row Identity"
+scope: [service]
+always_apply: false
+context: ""
+
+requirements:
+  - "The Specialist model MUST carry a row_index: int field populated from the source Team sheet row during list_from_sheet."
+  - "All storage operations that write data to a specific Team sheet row (update_timesheet_ids) MUST target the row by row_index, not by name-based lookup."
+  - "When two or more specialists share the same name, report/calculation sheet tab names MUST be disambiguated with a row-based suffix: '{name} ({row_index})'."
+  - "Current Period sheet specialist rows MUST use the disambiguated specialist name as the lookup key for all matching operations (sync_rates_to_current_period, update_current_period)."
+  - "All specialist identity comparisons crossing sheet boundaries MUST use row_index or the disambiguated name -- never a raw name string that may collide."
+
+prohibitions:
+  - "Storage operations matching specialists by raw name string alone without considering row identity or disambiguation."
+  - "Silently dropping or overwriting a specialist when a name collision is detected -- collisions MUST be handled with an explicit disambiguation strategy."
+
+checks:
+  specialist-model-row-index:
+    type: regex
+    severity: error
+    aspect: data
+    description: "Specialist model must carry row_index field"
+    files: "src/feptm/models/specialist.py"
+    positive:
+      - pattern: 'row_index'
+        message: "Specialist model missing row_index field"
+
+  no-name-only-team-write:
+    type: regex
+    severity: warn
+    aspect: data
+    description: "Team sheet writes must not rely on name-only row lookup"
+    files: "src/feptm/storage/specialist_storage.py"
+    exclude_lines:
+      - 'AR-DATA-001:allow'
+      - '^\s*#'
+    negative:
+      - pattern: 'find_specialist_row_index'
+        message: "Name-only row lookup in Team sheet -- use row_index for precise targeting"
+
+enforcement: []

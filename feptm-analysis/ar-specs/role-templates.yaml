@@ -12,6 +12,7 @@ roles:
       - AR-ARCH-002
       - AR-ARCH-003
       - AR-ARCH-004
+      - AR-DATA-001
     audit: []
 
   analysis:

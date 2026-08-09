@@ -618,7 +618,7 @@ class GoogleSheetsService:
         """
         return f"{sheet_name}!{start_col}{row}:{end_col}{row}"
 
-    def find_specialist_row_index(
+    def find_specialist_row_index(  # AR-DATA-001:allow
         self, values: list[list], name_col_idx: int, specialist_name: str
     ) -> int | None:
         """Find row index for a specialist by name.

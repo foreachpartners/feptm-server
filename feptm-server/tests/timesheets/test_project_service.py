@@ -264,16 +264,105 @@ class TestProjectServiceFacade:
         mock_add.assert_not_called()
         mock_update.assert_not_called()
 
-    def test_sync_project_rates_missing_metadata(self, project_service):
+    def test_sync_resolves_display_names_on_collision(self, project_service):
+        from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
-        sp = Specialist(name="Bob", role="Dev", timesheet="ts-1")
-        project_service._specialists.list_from_sheet = MagicMock(
-            return_value=([sp], 1)
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            project_info_spreadsheet_id="info-id",
+            report_spreadsheet_id="report-id",
         )
         project_service._projects.get_project_metadata = MagicMock(
-            side_effect=Exception("Project not found")
+            return_value=project
         )
 
-        with pytest.raises(Exception, match="Project not found"):
-            project_service.sync_project_rates("bad-id")
+        sp1 = Specialist(
+            name="John Smith", role="Dev", internal_rate="100",
+            external_rate="120", timesheet="ts-1", row_index=2,
+        )
+        sp2 = Specialist(
+            name="John Smith", role="QA", internal_rate="80",
+            external_rate="100", timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp1, sp2], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        project_service.sync_project_rates("test-project-id")
+
+        assert sp1.display_name == "John Smith (2)"
+        assert sp2.display_name == "John Smith (3)"
+
+    def test_sync_no_collision_preserves_name(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp1 = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        sp2 = Specialist(
+            name="Jane", role="QA", timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp1, sp2], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        project_service.sync_project_rates("test-project-id")
+
+        assert sp1.display_name == "John"
+        assert sp2.display_name == "Jane"
+
+    def test_sync_duplicate_names_passes_display_name_to_storage(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp1 = Specialist(
+            name="Sam", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        sp2 = Specialist(
+            name="Sam", role="QA", timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp1, sp2], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        project_service.sync_project_rates("test-project-id")
+
+        assert mock_add.call_count == 2
+        assert mock_add.call_args_list[0][0][1].display_name == "Sam (2)"
+        assert mock_add.call_args_list[1][0][1].display_name == "Sam (3)"
