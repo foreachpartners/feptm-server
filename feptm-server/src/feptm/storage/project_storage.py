@@ -623,6 +623,56 @@ class ProjectStorage:
         log.info("Archived Current Period as %s in spreadsheet", period_name)
         return True
 
+    def remove_stale_specialists(
+        self,
+        spreadsheet_id: str,
+        active_names: set[str],
+    ) -> int:
+        cp_data = self._read_current_period(
+            spreadsheet_id, SheetName.CURRENT_PERIOD.value
+        )
+        if not cp_data:
+            return 0
+        values, headers, cp_sheet = cp_data
+
+        sheet_id = cp_sheet.get("properties", {}).get("sheetId")
+        if sheet_id is None:
+            return 0
+
+        specialist_col = 0
+        rows_to_delete: list[int] = []
+        for i, row in enumerate(values[1:], start=1):
+            _pad_row(row, len(headers))
+            name = row[specialist_col] if specialist_col < len(row) else ""
+            if not name or name in active_names:
+                continue
+            if _is_total_row(row, headers, specialist_col, self._sheets):
+                continue
+            rows_to_delete.append(i)
+
+        if not rows_to_delete:
+            return 0
+
+        requests: list[dict] = []
+        for row_idx in sorted(rows_to_delete, reverse=True):
+            requests.append({
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": row_idx,
+                        "endIndex": row_idx + 1,
+                    }
+                }
+            })
+        self._sheets.batch_update(spreadsheet_id, requests)
+        removed = len(rows_to_delete)
+        log.info(
+            "Removed %d stale specialist rows from Current Period in %s",
+            removed, spreadsheet_id,
+        )
+        return removed
+
     def _extract_timesheet_id_from_tab(
         self,
         spreadsheet_id: str,

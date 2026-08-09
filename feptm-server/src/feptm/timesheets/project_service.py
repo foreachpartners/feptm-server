@@ -113,6 +113,16 @@ class TimesheetProjectService:
                     project.calculations_spreadsheet_id, sp, self._formulas
                 )
 
+        active_names = {sp.display_name or sp.name for sp in specialists}
+        if project.report_spreadsheet_id:
+            self._projects.remove_stale_specialists(
+                project.report_spreadsheet_id, active_names
+            )
+        if project.calculations_spreadsheet_id:
+            self._projects.remove_stale_specialists(
+                project.calculations_spreadsheet_id, active_names
+            )
+
         log.info(
             "Synchronized %d specialists, created %d new timesheets",
             len(specialists),
@@ -175,6 +185,16 @@ class TimesheetProjectService:
                 self._projects.sync_rates_to_current_period(
                     project.calculations_spreadsheet_id, sp
                 )
+
+        active_names = {sp.display_name or sp.name for sp in specialists}
+        if project.report_spreadsheet_id:
+            self._projects.remove_stale_specialists(
+                project.report_spreadsheet_id, active_names
+            )
+        if project.calculations_spreadsheet_id:
+            self._projects.remove_stale_specialists(
+                project.calculations_spreadsheet_id, active_names
+            )
 
         updated_count = sum(1 for sp in specialists if sp.timesheet)
         log.info("Synced rates for %d specialists", updated_count)
