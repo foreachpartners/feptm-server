@@ -366,3 +366,159 @@ class TestProjectServiceFacade:
         assert mock_add.call_count == 2
         assert mock_add.call_args_list[0][0][1].display_name == "Sam (2)"
         assert mock_add.call_args_list[1][0][1].display_name == "Sam (3)"
+
+    def test_close_period_matching_entries(self, project_service):
+        from datetime import datetime, timezone
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.close_period_in_timesheet = MagicMock(
+            return_value=5
+        )
+        project_service._projects.archive_current_period = MagicMock(
+            return_value=True
+        )
+        project_service._projects.protect_archived_sheet = MagicMock()
+
+        result = project_service.close_period(
+            "test-id",
+            "January 2026",
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 1, 31, tzinfo=timezone.utc),
+        )
+
+        assert result.entries_updated == 5
+        assert result.specialists_processed == 1
+        assert result.report_archived is True
+        assert result.calculations_archived is True
+        assert project_service._projects.archive_current_period.call_count == 2
+        assert project_service._projects.protect_archived_sheet.call_count == 2
+
+    def test_close_period_no_matching_entries(self, project_service):
+        from datetime import datetime, timezone
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.close_period_in_timesheet = MagicMock(
+            return_value=0
+        )
+        project_service._projects.archive_current_period = MagicMock()
+        project_service._projects.protect_archived_sheet = MagicMock()
+
+        result = project_service.close_period(
+            "test-id",
+            "Q2",
+            datetime(2026, 4, 1, tzinfo=timezone.utc),
+            datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+
+        assert result.entries_updated == 0
+        assert result.specialists_processed == 1
+        assert result.report_archived is False
+        assert result.calculations_archived is False
+        project_service._projects.archive_current_period.assert_not_called()
+        project_service._projects.protect_archived_sheet.assert_not_called()
+
+    def test_close_period_no_timesheet_specialists(self, project_service):
+        from datetime import datetime, timezone
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="Jane", role="QA", timesheet=None, row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.close_period_in_timesheet = MagicMock()
+        project_service._projects.archive_current_period = MagicMock()
+
+        result = project_service.close_period(
+            "test-id",
+            "Q1",
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 3, 31, tzinfo=timezone.utc),
+        )
+
+        assert result.entries_updated == 0
+        assert result.specialists_processed == 0
+        project_service._projects.close_period_in_timesheet.assert_not_called()
+        project_service._projects.archive_current_period.assert_not_called()
+
+    def test_close_period_none_report_calculations(self, project_service):
+        from datetime import datetime, timezone
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id=None,
+            calculations_spreadsheet_id=None,
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.close_period_in_timesheet = MagicMock(
+            return_value=3
+        )
+        project_service._projects.archive_current_period = MagicMock()
+        project_service._projects.protect_archived_sheet = MagicMock()
+
+        result = project_service.close_period(
+            "test-id",
+            "Q1",
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 3, 31, tzinfo=timezone.utc),
+        )
+
+        assert result.entries_updated == 3
+        assert result.report_archived is False
+        assert result.calculations_archived is False
+        project_service._projects.archive_current_period.assert_not_called()

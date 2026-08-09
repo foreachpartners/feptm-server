@@ -36,6 +36,10 @@ class ColumnName(Enum):
     CLIENT_WORK_COST_USD = "Client Work Cost (USD)"
     SPECIALIST_WORK_COST_USD = "Specialist Work Cost (USD)"
     REVENUE_USD = "Revenue (USD)"
+    TASK_NAME = "Task Name"
+    WORK_HOURS = "Work Hours"
+    PAYMENT_PERIOD = "Payment Period"
+    PAYMENT_STATUS = "Payment Status"
 
 
 class DateFormat(Enum):
@@ -47,6 +51,7 @@ class RangeFormat(Enum):
     SPECIALIST_DATA = "{sheet_name}!A1:Z100"
     PROJECT_INFO = "Project info!A1:B20"
     CURRENT_PERIOD = "{sheet_name}!A1:J100"
+    TIMESHEET_DATA = "{sheet_name}!A1:F100"
     SINGLE_CELL = "{sheet_name}!A1"
     HEADER_ROW = "{sheet_name}!A1:{column}{row}"
 

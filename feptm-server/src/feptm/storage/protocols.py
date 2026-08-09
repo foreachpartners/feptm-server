@@ -1,5 +1,6 @@
 """Protocol interfaces for storage abstraction layer."""
 
+from datetime import datetime
 from typing import Protocol
 
 from feptm.models.context import TimesheetContext
@@ -51,6 +52,36 @@ class ProjectStorageProtocol(Protocol):
         specialist: Specialist,
     ) -> None:
         """Update rate fields for an existing specialist in the Current Period sheet."""
+        ...
+
+    def close_period_in_timesheet(
+        self,
+        timesheet_id: str,
+        period_name: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """Write period_name to Payment Period column for matching entries in a timesheet."""
+        ...
+
+    def archive_current_period(
+        self,
+        spreadsheet_id: str,
+        period_name: str,
+        specialists: list[Specialist],
+        start_date: datetime,
+        end_date: datetime,
+    ) -> bool:
+        """Copy Current Period structure to period_name with values computed from timesheet data."""
+        ...
+
+    def protect_archived_sheet(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+        payment_status_col_idx: int,
+    ) -> None:
+        """Add protected ranges to an archived tab, leaving Payment Status editable."""
         ...
 
 

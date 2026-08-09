@@ -1,9 +1,11 @@
 """Service for handling project timesheets and related operations."""
 
 from collections import Counter
+from datetime import UTC, datetime
 
 from feptm.core.log import log
 from feptm.models.context import TimesheetContext
+from feptm.models.payment_period import ClosePeriodResponse
 from feptm.models.project import Project
 from feptm.models.specialist import Specialist
 from feptm.storage.protocols import (
@@ -177,3 +179,75 @@ class TimesheetProjectService:
         updated_count = sum(1 for sp in specialists if sp.timesheet)
         log.info("Synced rates for %d specialists", updated_count)
         return specialists, updated_count
+
+    def close_period(
+        self,
+        project_id: str,
+        period_name: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> ClosePeriodResponse:
+        project = self._projects.get_project_metadata(project_id)
+        specialists, _ = self._specialists.list_from_sheet(project_id)
+
+        _resolve_display_names(specialists)
+
+        total_entries = 0
+        specialists_processed = 0
+        report_archived = False
+        calculations_archived = False
+
+        for sp in specialists:
+            if not sp.timesheet:
+                continue
+            updated = self._projects.close_period_in_timesheet(
+                sp.timesheet, period_name, start_date, end_date
+            )
+            specialists_processed += 1
+            total_entries += updated
+
+        if total_entries > 0:
+            if project.report_spreadsheet_id:
+                report_archived = self._projects.archive_current_period(
+                    project.report_spreadsheet_id,
+                    period_name,
+                    specialists,
+                    start_date,
+                    end_date,
+                )
+                if report_archived:
+                    self._projects.protect_archived_sheet(
+                        project.report_spreadsheet_id,
+                        period_name,
+                        payment_status_col_idx=5,
+                    )
+            if project.calculations_spreadsheet_id:
+                calculations_archived = self._projects.archive_current_period(
+                    project.calculations_spreadsheet_id,
+                    period_name,
+                    specialists,
+                    start_date,
+                    end_date,
+                )
+                if calculations_archived:
+                    self._projects.protect_archived_sheet(
+                        project.calculations_spreadsheet_id,
+                        period_name,
+                        payment_status_col_idx=5,
+                    )
+
+        log.info(
+            "Closed period %s: %d entries updated, %d specialists processed",
+            period_name,
+            total_entries,
+            specialists_processed,
+        )
+        return ClosePeriodResponse(
+            created=datetime.now(UTC),
+            project_id=project_id,
+            period_name=period_name,
+            entries_updated=total_entries,
+            specialists_processed=specialists_processed,
+            report_archived=report_archived,
+            calculations_archived=calculations_archived,
+        )

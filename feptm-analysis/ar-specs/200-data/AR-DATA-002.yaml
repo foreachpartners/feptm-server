@@ -1,0 +1,21 @@
+id: "AR-DATA-002"
+title: "Source Entity Future Exclusion"
+scope: [service]
+always_apply: false
+context: ""
+
+requirements:
+  - "Deleting a row from a source sheet (Team) MUST be treated as a future-exclusion gate — the entity MUST NOT be included in new period formations or subsequent sync operations."
+  - "Existing copies of the deleted entity in open Current periods, personal timesheets, personal report tabs, and archived reports MUST be preserved unchanged."
+  - "Period close operations MUST include all work of now-absent entities that were present during the period."
+  - "When forming the next Current period after closure, only currently-present source entities MUST be included."
+  - "Sync operations (sync_project_specialists) MUST check source-sheet membership and MUST NOT restore or re-add entities absent from the source sheet."
+
+prohibitions:
+  - "Cascading deletion of downstream copies (period rows, timesheet tabs, report tabs) when a source row is deleted."
+  - "Restoring or re-adding a removed specialist to future periods via sync, period close, or any automated operation."
+  - "Silently dropping a now-absent specialist's work during period close — their contribution MUST be included."
+
+checks: {}
+
+enforcement: []

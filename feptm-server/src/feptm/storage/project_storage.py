@@ -1,6 +1,6 @@
 """Storage for project-scoped spreadsheet operations."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from feptm.core import utils
@@ -427,6 +427,288 @@ class ProjectStorage:
         )
         log.info("Copied row %d to row %d", source_row, target_row)
 
+    def close_period_in_timesheet(
+        self,
+        timesheet_id: str,
+        period_name: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        if not self._sheets.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+
+        spreadsheet = (
+            self._sheets.sheets_service.spreadsheets()
+            .get(spreadsheetId=timesheet_id)
+            .execute()
+        )
+        sheets_list = spreadsheet.get("sheets", [])
+        if not sheets_list:
+            return 0
+        sheet_name = sheets_list[0].get("properties", {}).get("title", "")
+        if not sheet_name:
+            return 0
+
+        range_name = RangeFormat.TIMESHEET_DATA.value.format(sheet_name=sheet_name)
+        result = (
+            self._sheets.sheets_service.spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=timesheet_id,
+                range=range_name,
+                valueRenderOption="UNFORMATTED_VALUE",
+            )
+            .execute()
+        )
+        values: list[list] = result.get("values", [])
+        if not values or len(values) < 2:
+            return 0
+
+        headers = values[0]
+        date_col = self._sheets.find_column_index(headers, [ColumnName.DATE.value])
+        period_col = self._sheets.find_column_index(
+            headers, [ColumnName.PAYMENT_PERIOD.value]
+        )
+        if period_col is None:
+            period_col = _find_column_contains(
+                headers, ColumnName.PAYMENT_PERIOD.value
+            )
+        if date_col is None or period_col is None:
+            log.warning(
+                "Timesheet %s: missing columns. headers=%s, Date found=%s, Payment Period found=%s",
+                timesheet_id, headers,
+                date_col is not None, period_col is not None,
+            )
+            return 0
+
+        updates = 0
+        for i in range(1, len(values)):
+            row = values[i]
+            if len(row) <= date_col:
+                continue
+            date_val = row[date_col]
+            parsed = _serial_to_date(date_val)
+            if parsed is None:
+                continue
+            if parsed < start_date or parsed > end_date:
+                continue
+            period_cell = row[period_col] if len(row) > period_col else ""
+            if period_cell and str(period_cell).strip():
+                continue
+            col_letter = self._sheets.column_index_to_letter(period_col)
+            try:
+                self._sheets.update_range(
+                    spreadsheet_id=timesheet_id,
+                    range_name=f"{sheet_name}!{col_letter}{i + 1}",
+                    values=[[period_name]],
+                    value_input_option="RAW",
+                )
+                updates += 1
+            except Exception as exc:
+                log.warning("Failed to update Payment Period for row %d: %s", i + 1, exc)
+
+        log.info(
+            "Updated %d entries in timesheet %s for period %s",
+            updates,
+            timesheet_id,
+            period_name,
+        )
+        return updates
+
+    def archive_current_period(
+        self,
+        spreadsheet_id: str,
+        period_name: str,
+        specialists: list[Specialist],
+        start_date: datetime,
+        end_date: datetime,
+    ) -> bool:
+        if not self._sheets.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+
+        existing = self._list_sheet_titles(spreadsheet_id)
+        if period_name in existing:
+            log.info("Archived tab %s already exists, skipping", period_name)
+            return False
+
+        cp_data = self._read_current_period(
+            spreadsheet_id, SheetName.CURRENT_PERIOD.value
+        )
+        if not cp_data:
+            return False
+        values, headers, _ = cp_data
+
+        sp_map = {
+            sp.display_name or sp.name: sp
+            for sp in specialists
+            if sp.timesheet
+        }
+
+        archive = [list(headers)]
+        num_cols = len(headers)
+
+        for row in values[1:]:
+            _pad_row(row, num_cols)
+            sp_name = row[0] if row else ""
+            sp = sp_map.get(sp_name)
+
+            if sp is None:
+                archive.append(list(row))
+                continue
+
+            timesheet_id = sp.timesheet or ""
+            if not timesheet_id:
+                archive.append(list(row))
+                continue
+            hours = self._sum_timesheet_hours(timesheet_id, start_date, end_date)
+            if hours <= 0:
+                archive.append(list(row))
+                continue
+
+            cl_rate = float(sp.external_rate)
+            sp_rate = float(sp.internal_rate)
+            cl_cost = round(hours * cl_rate, 2)
+            sp_cost = round(hours * sp_rate, 2)
+            revenue = round(cl_cost - sp_cost, 2)
+
+            new_row = list(row)
+            for col_name, val in [
+                (ColumnName.HOURS_WORKED.value, str(hours)),
+                (ColumnName.CLIENT_HOURLY_RATE_USD.value, str(cl_rate)),
+                (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(sp_rate)),
+                (ColumnName.CLIENT_WORK_COST_USD.value, str(cl_cost)),
+                (ColumnName.SPECIALIST_WORK_COST_USD.value, str(sp_cost)),
+                (ColumnName.REVENUE_USD.value, str(revenue)),
+            ]:
+                col_idx = _find_column_contains(headers, col_name)
+                if col_idx is not None:
+                    _pad_row(new_row, col_idx + 1)
+                    new_row[col_idx] = val
+            archive.append(new_row)
+
+        self._sheets.batch_update(
+            spreadsheet_id=spreadsheet_id,
+            requests=[{"addSheet": {"properties": {"title": period_name}}}],
+        )
+        new_range = RangeFormat.CURRENT_PERIOD.value.format(
+            sheet_name=period_name
+        )
+        self._sheets.update_range(
+            spreadsheet_id=spreadsheet_id,
+            range_name=new_range,
+            values=archive,
+            value_input_option="RAW",
+        )
+        log.info("Archived Current Period as %s in spreadsheet", period_name)
+        return True
+
+    def _sum_timesheet_hours(
+        self,
+        timesheet_id: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> float:
+        if not self._sheets.sheets_service:
+            return 0.0
+        spreadsheet = (
+            self._sheets.sheets_service.spreadsheets()
+            .get(spreadsheetId=timesheet_id)
+            .execute()
+        )
+        sheets_list = spreadsheet.get("sheets", [])
+        if not sheets_list:
+            return 0.0
+        sheet_name = sheets_list[0].get("properties", {}).get("title", "")
+        if not sheet_name:
+            return 0.0
+
+        range_name = RangeFormat.TIMESHEET_DATA.value.format(
+            sheet_name=sheet_name
+        )
+        result = (
+            self._sheets.sheets_service.spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=timesheet_id,
+                range=range_name,
+                valueRenderOption="UNFORMATTED_VALUE",
+            )
+            .execute()
+        )
+        values: list[list] = result.get("values", [])
+        if not values or len(values) < 2:
+            return 0.0
+
+        headers = values[0]
+        date_col = self._sheets.find_column_index(headers, [ColumnName.DATE.value])
+        hours_col = self._sheets.find_column_index(headers, [ColumnName.WORK_HOURS.value])
+
+        if date_col is None or hours_col is None:
+            return 0.0
+
+        total = 0.0
+        for i in range(1, len(values)):
+            row = values[i]
+            if len(row) <= max(date_col, hours_col):
+                continue
+            parsed = _serial_to_date(row[date_col])
+            if parsed is None:
+                continue
+            if parsed < start_date or parsed > end_date:
+                continue
+            try:
+                total += float(row[hours_col] or 0)
+            except (ValueError, TypeError):
+                continue
+        return total
+
+    def protect_archived_sheet(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+        payment_status_col_idx: int,
+    ) -> None:
+        if not self._sheets.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+
+        spreadsheet = (
+            self._sheets.sheets_service.spreadsheets()
+            .get(spreadsheetId=spreadsheet_id)
+            .execute()
+        )
+        sheet_id = None
+        for s in spreadsheet.get("sheets", []):
+            if s.get("properties", {}).get("title") == sheet_name:
+                sheet_id = s.get("properties", {}).get("sheetId")
+                break
+        if sheet_id is None:
+            raise Exception(f"Sheet ID not found for '{sheet_name}'")
+
+        self._sheets.batch_update(
+            spreadsheet_id=spreadsheet_id,
+            requests=[
+                {
+                    "addProtectedRange": {
+                        "protectedRange": {
+                            "range": {
+                                "sheetId": sheet_id,
+                            },
+                            "unprotectedRanges": [
+                                {
+                                    "sheetId": sheet_id,
+                                    "startColumnIndex": payment_status_col_idx,
+                                    "endColumnIndex": payment_status_col_idx + 1,
+                                }
+                            ],
+                            "description": "Archived period — protected",
+                            "warningOnly": False,
+                        }
+                    }
+                }
+            ],
+        )
+        log.info("Protected archived sheet %s", sheet_name)
+
 
 def _spreadsheet_title(project_name: str, key: str) -> str:
     titles = {
@@ -435,6 +717,78 @@ def _spreadsheet_title(project_name: str, key: str) -> str:
         "calculations": f"{project_name} - Payment Distribution",
     }
     return titles.get(key, f"{project_name} - {key}")
+
+
+_GSHEETS_EPOCH = datetime(1899, 12, 30)
+
+_RUSSIAN_MONTHS = {
+    "янв": 1, "январь": 1, "января": 1,
+    "фев": 2, "февр": 2, "февраль": 2, "февраля": 2,
+    "мар": 3, "март": 3, "марта": 3,
+    "апр": 4, "апрель": 4, "апреля": 4,
+    "май": 5, "мая": 5,
+    "июн": 6, "июнь": 6, "июня": 6,
+    "июл": 7, "июль": 7, "июля": 7,
+    "авг": 8, "август": 8, "августа": 8,
+    "сен": 9, "сент": 9, "сентябрь": 9, "сентября": 9,
+    "окт": 10, "октябрь": 10, "октября": 10,
+    "ноя": 11, "нояб": 11, "ноябрь": 11, "ноября": 11,
+    "дек": 12, "декабрь": 12, "декабря": 12,
+}
+
+
+def _find_column_contains(headers: list[str], needle: str) -> int | None:
+    needle_lower = needle.lower()
+    for i, header in enumerate(headers):
+        if needle_lower in header.lower():
+            return i
+    return None
+
+
+def _pad_row(row: list, size: int) -> None:
+    while len(row) < size:
+        row.append("")
+
+
+def _serial_to_date(value: Any) -> datetime | None:
+    if isinstance(value, (int, float)) and value > 0:
+        return (_GSHEETS_EPOCH + timedelta(days=int(value))).replace(
+            tzinfo=timezone.utc
+        )
+    if isinstance(value, str) and value.strip():
+        val = value.strip()
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%b %d, %Y"):
+            try:
+                return datetime.strptime(val, fmt).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+        parsed = _parse_russian_date(val)
+        if parsed is not None:
+            return parsed.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _parse_russian_date(val: str) -> datetime | None:
+    import re
+
+    cleaned = re.sub(r"[,\s]+", " ", val).strip()
+    parts = cleaned.split()
+    if len(parts) < 3:
+        return None
+
+    for i, part in enumerate(parts):
+        month_name = part.rstrip(".").lower()
+        if month_name in _RUSSIAN_MONTHS:
+            month = _RUSSIAN_MONTHS[month_name]
+            day_part = parts[0] if i > 0 else parts[1]
+            year_part = parts[-1]
+            try:
+                day = int(day_part)
+                year = int(year_part)
+                return datetime(year, month, day)
+            except (ValueError, IndexError):
+                return None
+    return None
 
 
 def _hyperlink(url: str) -> str:
