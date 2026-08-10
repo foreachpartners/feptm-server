@@ -39,6 +39,16 @@ class SpecialistStorage:
             raise Exception("Timesheet template ID not configured")
 
         title = utils.generate_timesheet_title(specialist.name, context.project_name)
+
+        existing_id = self._sheets.find_file_in_folder(context.folder_id, title)
+        if existing_id:
+            specialist.timesheet = existing_id
+            log.info("Reusing existing timesheet for %s", specialist.name)
+            return {
+                "spreadsheet_id": existing_id,
+                "spreadsheet_url": f"https://docs.google.com/spreadsheets/d/{existing_id}",
+            }
+
         result = self._sheets.ensure_spreadsheet_from_template(
             template_id=template_id, new_title=title, folder_id=context.folder_id
         )
@@ -197,7 +207,9 @@ class SpecialistStorage:
 
         col_letter = self._sheets.column_index_to_letter(timesheet_col)
         for row_idx, ts_id in updates:
-            url = f"https://docs.google.com/spreadsheets/d/{ts_id}"
+            if "spreadsheets/d/" not in ts_id:
+                ts_id = f"https://docs.google.com/spreadsheets/d/{ts_id}"
+            url = ts_id
             self._sheets.update_range(
                 spreadsheet_id=spreadsheet_id,
                 range_name=f"{sheet_name}!{col_letter}{row_idx}",

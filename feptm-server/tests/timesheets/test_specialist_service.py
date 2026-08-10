@@ -92,6 +92,7 @@ class TestSpecialistStorage:
         assert specialists == []
 
     def test_create_timesheet_success(self, specialist_storage, mock_sheets):
+        mock_sheets.find_file_in_folder.return_value = None
         mock_sheets.ensure_spreadsheet_from_template.return_value = TIMESHEET_RESULT
 
         spec = Specialist(name="John", role="Dev")
@@ -106,6 +107,27 @@ class TestSpecialistStorage:
         with pytest.raises(Exception, match="Timesheet template ID not configured"):
             specialist_storage.create_timesheet(spec, TIMESHEET_CONTEXT, "")
 
+    def test_create_timesheet_reuses_existing_drive_file(self, specialist_storage, mock_sheets):
+        mock_sheets.find_file_in_folder.return_value = "existing-timesheet-id"
+
+        spec = Specialist(name="John", role="Dev")
+        result = specialist_storage.create_timesheet(spec, TIMESHEET_CONTEXT, "tmpl-id")
+
+        assert result["spreadsheet_id"] == "existing-timesheet-id"
+        assert spec.timesheet == "existing-timesheet-id"
+        mock_sheets.ensure_spreadsheet_from_template.assert_not_called()
+
+    def test_create_timesheet_creates_new_when_none_found(self, specialist_storage, mock_sheets):
+        mock_sheets.find_file_in_folder.return_value = None
+        mock_sheets.ensure_spreadsheet_from_template.return_value = TIMESHEET_RESULT
+
+        spec = Specialist(name="John", role="Dev")
+        result = specialist_storage.create_timesheet(spec, TIMESHEET_CONTEXT, "tmpl-id")
+
+        assert result == TIMESHEET_RESULT
+        assert spec.timesheet == "new-timesheet-id-789"
+        mock_sheets.ensure_spreadsheet_from_template.assert_called_once()
+
     def test_update_timesheet_ids(self, specialist_storage, mock_sheets):
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
@@ -116,6 +138,22 @@ class TestSpecialistStorage:
 
         assert result is True
         mock_sheets.update_range.assert_called_once()
+
+    def test_update_timesheet_ids_no_double_wrap_for_url_input(self, specialist_storage, mock_sheets):
+        data = SAMPLE_VALUES
+        headers = SAMPLE_HEADERS
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        spec = Specialist(
+            name="John Doe", role="Lead Developer",
+            timesheet="https://docs.google.com/spreadsheets/d/already-a-url",
+            row_index=2,
+        )
+        result = specialist_storage.update_timesheet_ids("test-id", "Team", [spec])
+
+        assert result is True
+        call_args = mock_sheets.update_range.call_args[1]
+        assert call_args["values"] == [["https://docs.google.com/spreadsheets/d/already-a-url"]]
 
     def test_update_timesheet_ids_no_updates(self, specialist_storage, mock_sheets):
         data = SAMPLE_VALUES

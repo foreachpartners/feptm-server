@@ -1,7 +1,9 @@
 created: '2026-08-10'
-description: Fix Current Period sync and IMPORTRANGE placeholder mismatch
+description: Fix Current Period sync, IMPORTRANGE placeholder mismatch, and specialist
+  re-add cycle (BUG-03)
 fr_ids:
 - FR-SYNC-001
+- FR-SPECIALIST-001
 repos:
 - feptm-server
 - feptm-analysis
@@ -19,3 +21,5 @@ sessions:
   plan_3: SID-1786374546-b2c653c4
   implement_3: SID-1786373869-507822a4
   finalize_3: SID-1786374799-eaa68a69
+  plan_4: SID-1786401041-dbfa2afb
+  implement_4: SID-1786401526-8f6ad78d

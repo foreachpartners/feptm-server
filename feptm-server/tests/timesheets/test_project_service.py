@@ -190,6 +190,66 @@ class TestProjectStorage:
 
         assert '=IMPORTRANGE("https://docs.google.com/spreadsheets/d/real-timesheet-123";"Sheet1!A:Z")' == result
 
+    def test_get_import_timesheet_formula_no_double_wrap_for_url_input(self, mock_sheets):
+        mock_sheets.is_initialized.return_value = True
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Formulas"}}
+        mock_sheets.sheets_service.spreadsheets.return_value.values.return_value.get.return_value.execute.return_value = {
+            "values": [
+                ["Formula Name", "Formula"],
+                ["Import specialist timesheet", '=IMPORTRANGE("SpecialistSpreadsheetID";"Sheet1!A:Z")'],
+            ]
+        }
+
+        config = ConfigStorage(mock_sheets, "config-sheet-id")
+        url_input = "https://docs.google.com/spreadsheets/d/1xSx-Uoi-kQQOrg"
+        result = config.get_import_timesheet_formula(url_input)
+
+        expected = f'=IMPORTRANGE("{url_input}";"Sheet1!A:Z")'
+        assert expected == result
+
+    def test_add_specialist_to_report_updates_formula_when_tab_exists(self, project_storage, mock_sheets):
+        from feptm.models.specialist import Specialist
+
+        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [{"properties": {"title": "John Doe"}}],
+        }
+
+        spec = Specialist(name="John Doe", role="Dev", timesheet="ts-id")
+        formula = '=IMPORTRANGE("ts-id";"Sheet1!A:Z")'
+
+        project_storage.add_specialist_to_report("spreadsheet-id", spec, formula)
+
+        mock_sheets.batch_update.assert_not_called()
+        mock_sheets.update_range.assert_called_once_with(
+            spreadsheet_id="spreadsheet-id",
+            range_name="John Doe!A1",
+            values=[[formula]],
+            value_input_option="USER_ENTERED",
+        )
+
+    def test_add_specialist_to_report_creates_tab_and_writes_formula_when_absent(self, project_storage, mock_sheets):
+        from feptm.models.specialist import Specialist
+
+        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [],
+        }
+
+        spec = Specialist(name="John Doe", role="Dev", timesheet="ts-id")
+        formula = '=IMPORTRANGE("ts-id";"Sheet1!A:Z")'
+
+        project_storage.add_specialist_to_report("spreadsheet-id", spec, formula)
+
+        mock_sheets.batch_update.assert_called_once_with(
+            spreadsheet_id="spreadsheet-id",
+            requests=[{"addSheet": {"properties": {"title": "John Doe"}}}],
+        )
+        mock_sheets.update_range.assert_called_once_with(
+            spreadsheet_id="spreadsheet-id",
+            range_name="John Doe!A1",
+            values=[[formula]],
+            value_input_option="USER_ENTERED",
+        )
+
 
 class TestProjectServiceFacade:
 

@@ -213,13 +213,13 @@ class ProjectStorage:
                 spreadsheet_id=spreadsheet_id,
                 requests=[{"addSheet": {"properties": {"title": tab_name}}}],
             )
-            self._sheets.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
-                values=[[import_formula]],
-                value_input_option="USER_ENTERED",
-            )
             log.info("Created tab for %s in spreadsheet", specialist.name)
+        self._sheets.update_range(
+            spreadsheet_id=spreadsheet_id,
+            range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
+            values=[[import_formula]],
+            value_input_option="USER_ENTERED",
+        )
 
     def update_current_period(
         self,

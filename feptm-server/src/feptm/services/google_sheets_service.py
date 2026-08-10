@@ -389,6 +389,37 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to delete file with ID {file_id}: {error}")
 
+    def find_file_in_folder(self, folder_id: str, file_name: str) -> str | None:
+        """Search for a spreadsheet by name in a Drive folder.
+
+        Args:
+            folder_id: ID of the folder to search in
+            file_name: Exact file name to match
+
+        Returns:
+            File ID if found, None otherwise
+        """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
+        try:
+            query = (
+                f"'{folder_id}' in parents and name = '{file_name}'"
+                f" and mimeType = 'application/vnd.google-apps.spreadsheet'"
+                f" and trashed = false"
+            )
+            results = (
+                self.drive_service.files()
+                .list(q=query, fields="files(id, name)")
+                .execute()
+            )
+            files = results.get("files", [])
+            return files[0]["id"] if files else None
+        except HttpError as error:
+            raise Exception(
+                f"Failed to search files in folder {folder_id}: {error}"
+            )
+
     def move_file(self, file_id: str, folder_id: str) -> None:
         """Move a file to a different folder in Google Drive.
 
