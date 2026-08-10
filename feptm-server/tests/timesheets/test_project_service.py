@@ -188,7 +188,7 @@ class TestProjectStorage:
         config = ConfigStorage(mock_sheets, "config-sheet-id")
         result = config.get_import_timesheet_formula("real-timesheet-123")
 
-        assert '=IMPORTRANGE("real-timesheet-123";"Sheet1!A:Z")' == result
+        assert '=IMPORTRANGE("https://docs.google.com/spreadsheets/d/real-timesheet-123";"Sheet1!A:Z")' == result
 
 
 class TestProjectServiceFacade:

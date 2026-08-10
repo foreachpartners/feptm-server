@@ -62,8 +62,9 @@ class ConfigStorage:
 
     def get_import_timesheet_formula(self, specialist_timesheet_id: str) -> str:
         formula = self.get_formula("Import specialist timesheet")
+        url = f"https://docs.google.com/spreadsheets/d/{specialist_timesheet_id}"
         return re.sub(
             r"(SpecialistSpreadsheetID|\{timesheet_id\})",
-            specialist_timesheet_id,
+            url,
             formula,
         )

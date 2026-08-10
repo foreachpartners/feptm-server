@@ -197,10 +197,11 @@ class SpecialistStorage:
 
         col_letter = self._sheets.column_index_to_letter(timesheet_col)
         for row_idx, ts_id in updates:
+            url = f"https://docs.google.com/spreadsheets/d/{ts_id}"
             self._sheets.update_range(
                 spreadsheet_id=spreadsheet_id,
                 range_name=f"{sheet_name}!{col_letter}{row_idx}",
-                values=[[ts_id]],
+                values=[[url]],
                 value_input_option="RAW",
             )
 

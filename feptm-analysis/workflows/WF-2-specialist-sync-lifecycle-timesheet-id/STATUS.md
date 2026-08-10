@@ -14,4 +14,4 @@ Fix `_copy_row_formatting` in project_storage.py — replace `copyPaste PASTE_NO
 |---|------|-------|------|---------|
 | 1 | sync-fix | plan.md (v1) | 2026-08-08 | Planned: 5 tasks |
 | 2 | implement | archive/tasks-001.md | 2026-08-08 | 5/5 done, 0 ERR, 0 WARN |
-| 4 | placeholder-fix | archive/plan-003.md | 2026-08-10 | 3/3 done, 0 ERR, 0 WARN |
+| 5 | url-fix | archive/plan-004.md | 2026-08-10 | 4/4 done, 0 ERR, 0 WARN |
