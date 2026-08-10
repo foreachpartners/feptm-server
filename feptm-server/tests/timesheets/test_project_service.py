@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from feptm.models.project import Project
+from feptm.storage.config_storage import ConfigStorage
 from feptm.storage.project_storage import ProjectStorage
 from feptm.timesheets.project_service import TimesheetProjectService
 
@@ -174,16 +175,20 @@ class TestProjectStorage:
         assert "PASTE_FORMULA" in request_types
         assert "PASTE_FORMAT" in request_types
 
-        mock_sheets.batch_update.assert_called_once()
-        call_args = mock_sheets.batch_update.call_args[1]
-        assert call_args["spreadsheet_id"] == "spreadsheet-id"
+    def test_get_import_timesheet_formula_replaces_specialist_spreadsheet_id(self, mock_sheets):
+        mock_sheets.is_initialized.return_value = True
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Formulas"}}
+        mock_sheets.sheets_service.spreadsheets.return_value.values.return_value.get.return_value.execute.return_value = {
+            "values": [
+                ["Formula Name", "Formula"],
+                ["Import specialist timesheet", '=IMPORTRANGE("SpecialistSpreadsheetID";"Sheet1!A:Z")'],
+            ]
+        }
 
-        requests = call_args["requests"]
-        assert len(requests) == 2
+        config = ConfigStorage(mock_sheets, "config-sheet-id")
+        result = config.get_import_timesheet_formula("real-timesheet-123")
 
-        request_types = [r["copyPaste"]["pasteType"] for r in requests]
-        assert "PASTE_FORMULA" in request_types
-        assert "PASTE_FORMAT" in request_types
+        assert '=IMPORTRANGE("real-timesheet-123";"Sheet1!A:Z")' == result
 
 
 class TestProjectServiceFacade:

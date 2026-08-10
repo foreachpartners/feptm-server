@@ -1,5 +1,7 @@
 """Storage for formula retrieval from config spreadsheet."""
 
+import re
+
 from feptm.services.google_sheets_service import GoogleSheetsService
 from feptm.timesheets.config_service import SheetName
 
@@ -60,4 +62,8 @@ class ConfigStorage:
 
     def get_import_timesheet_formula(self, specialist_timesheet_id: str) -> str:
         formula = self.get_formula("Import specialist timesheet")
-        return formula.replace("{timesheet_id}", specialist_timesheet_id)
+        return re.sub(
+            r"(SpecialistSpreadsheetID|\{timesheet_id\})",
+            specialist_timesheet_id,
+            formula,
+        )
