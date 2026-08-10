@@ -152,6 +152,39 @@ class TestProjectStorage:
             )
         mock_sheets.delete_file.assert_called_once_with("new-folder-id")
 
+    def test_copy_row_formatting_uses_paste_formula_and_paste_format(self, project_storage, mock_sheets):
+        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [
+                {"properties": {"title": "Current period", "sheetId": 100}},
+            ]
+        }
+
+        project_storage._copy_row_formatting(
+            "spreadsheet-id", "Current period", source_row=3, target_row=5
+        )
+
+        mock_sheets.batch_update.assert_called_once()
+        call_args = mock_sheets.batch_update.call_args[1]
+        assert call_args["spreadsheet_id"] == "spreadsheet-id"
+
+        requests = call_args["requests"]
+        assert len(requests) == 2
+
+        request_types = [r["copyPaste"]["pasteType"] for r in requests]
+        assert "PASTE_FORMULA" in request_types
+        assert "PASTE_FORMAT" in request_types
+
+        mock_sheets.batch_update.assert_called_once()
+        call_args = mock_sheets.batch_update.call_args[1]
+        assert call_args["spreadsheet_id"] == "spreadsheet-id"
+
+        requests = call_args["requests"]
+        assert len(requests) == 2
+
+        request_types = [r["copyPaste"]["pasteType"] for r in requests]
+        assert "PASTE_FORMULA" in request_types
+        assert "PASTE_FORMAT" in request_types
+
 
 class TestProjectServiceFacade:
 

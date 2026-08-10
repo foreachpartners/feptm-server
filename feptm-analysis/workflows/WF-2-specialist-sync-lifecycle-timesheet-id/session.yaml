@@ -1,16 +1,15 @@
-created: '2026-08-08'
-sessions:
-  init: SID-1786219399-ba2c8cc6
-  plan: SID-1786219553-b9ffeb92
-  implement: SID-1786219641-4f2c2e1f
-  finalize: SID-1786219809-44788365
-description: Fix specialist sync lifecycle — timesheet ID write-back and auto-timesheet
-  creation for rate sync
+created: '2026-08-10'
+description: Fix Current Period sync — new specialist rows show only names
 fr_ids:
 - FR-SYNC-001
 repos:
 - feptm-server
 - feptm-analysis
 ceremony: medium
-status: implementing
+status: done
 baseline_policy: ignore
+sessions:
+  init: SID-1786371039-d80cfc4c
+  plan: SID-1786371311-369f886d
+  implement: SID-1786371864-fcca8572
+  finalize: SID-1786372990-81e660aa

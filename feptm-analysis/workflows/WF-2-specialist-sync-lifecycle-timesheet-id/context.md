@@ -174,6 +174,21 @@
 - URL patterns (docs.google.com/spreadsheets/d/, drive.google.com/drive/folders/) in model computed_field properties.
 - create_project() hardcoding exactly three spreadsheets — use a template registry or configuration list.
 
+#### AR-DATA-001: Specialist Row Identity
+
+**Requirements:**
+
+- The Specialist model MUST carry a row_index: int field populated from the source Team sheet row during list_from_sheet.
+- All storage operations that write data to a specific Team sheet row (update_timesheet_ids) MUST target the row by row_index, not by name-based lookup.
+- When two or more specialists share the same name, report/calculation sheet tab names MUST be disambiguated with a row-based suffix: '{name} ({row_index})'.
+- Current Period sheet specialist rows MUST use the disambiguated specialist name as the lookup key for all matching operations (sync_rates_to_current_period, update_current_period).
+- All specialist identity comparisons crossing sheet boundaries MUST use row_index or the disambiguated name -- never a raw name string that may collide.
+
+**Prohibitions:**
+
+- Storage operations matching specialists by raw name string alone without considering row identity or disambiguation.
+- Silently dropping or overwriting a specialist when a name collision is detected -- collisions MUST be handled with an explicit disambiguation strategy.
+
 ## Repo: feptm-analysis
 
 ### Identity

@@ -419,10 +419,30 @@ class ProjectStorage:
                             "startColumnIndex": 0,
                             "endColumnIndex": self.MAX_COLUMN_INDEX,
                         },
-                        "pasteType": "PASTE_NORMAL",
+                        "pasteType": "PASTE_FORMULA",
                         "pasteOrientation": "NORMAL",
                     }
-                }
+                },
+                {
+                    "copyPaste": {
+                        "source": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": source_row - 1,
+                            "endRowIndex": source_row,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": self.MAX_COLUMN_INDEX,
+                        },
+                        "destination": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": target_row - 1,
+                            "endRowIndex": target_row,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": self.MAX_COLUMN_INDEX,
+                        },
+                        "pasteType": "PASTE_FORMAT",
+                        "pasteOrientation": "NORMAL",
+                    }
+                },
             ],
         )
         log.info("Copied row %d to row %d", source_row, target_row)
