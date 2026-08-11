@@ -4,6 +4,7 @@ import time
 from datetime import UTC, datetime
 
 from feptm.core.log import log
+from feptm.core import utils
 from feptm.models.context import TimesheetContext
 from feptm.models.payment_period import ClosePeriodResponse
 from feptm.models.project import Project
@@ -264,8 +265,9 @@ class TimesheetProjectService:
         for sp in specialists:
             if not sp.timesheet:
                 continue
+            ts_id = utils.extract_id_from_hyperlink_formula(sp.timesheet) or sp.timesheet
             updated = self._projects.close_period_in_timesheet(
-                sp.timesheet, period_name, start_date, end_date
+                ts_id, period_name, start_date, end_date
             )
             specialists_processed += 1
             total_entries += updated

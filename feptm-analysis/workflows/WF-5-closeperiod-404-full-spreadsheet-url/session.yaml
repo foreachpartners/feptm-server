@@ -1,0 +1,17 @@
+created: '2026-08-11'
+description: 'fix close_period 404: full spreadsheet URL passed as spreadsheetId instead
+  of bare ID'
+fr_ids:
+- FR-PAYMENT-001
+- FR-SPECIALIST-001
+repos:
+- feptm-server
+- feptm-analysis
+ceremony: medium
+status: implementing
+sessions:
+  init: SID-1786476250-5bb858df
+  plan: SID-1786476390-9ced6d62
+  implement: SID-1786476993-b3973e01
+  finalize: SID-1786477384-f679e047
+baseline_policy: fix_all

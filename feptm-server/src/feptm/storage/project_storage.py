@@ -458,6 +458,8 @@ class ProjectStorage:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
 
+        timesheet_id = utils.extract_id_from_hyperlink_formula(timesheet_id) or timesheet_id
+
         spreadsheet = (
             self._sheets.sheets_service.spreadsheets()
             .get(spreadsheetId=timesheet_id)

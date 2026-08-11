@@ -221,8 +221,6 @@ class SpecialistStorage:
 
         requests: list[dict[str, Any]] = []
         for row_idx, ts_id in updates:
-            if "spreadsheets/d/" not in ts_id:
-                ts_id = f"https://docs.google.com/spreadsheets/d/{ts_id}"
             requests.append(
                 {
                     "updateCells": {
