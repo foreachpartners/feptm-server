@@ -14,4 +14,7 @@ sessions:
   plan: SID-1786476390-9ced6d62
   implement: SID-1786476993-b3973e01
   finalize: SID-1786477384-f679e047
+  plan_2: SID-1786479579-e2968998
+  implement_2: SID-1786479691-5664dcb7
+  finalize_2: SID-1786480941-4fbe4798
 baseline_policy: fix_all

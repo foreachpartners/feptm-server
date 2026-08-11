@@ -583,26 +583,14 @@ class ProjectStorage:
 
             sp = sp_map.get(sp_name)
             if sp is None:
-                row_copy = list(row)
-                _pad_row(row_copy, period_idx + 1)
-                row_copy[period_idx] = period_name
-                archive.append(row_copy)
                 continue
 
             timesheet_id = sp.timesheet or ""
             if not timesheet_id:
-                row_copy = list(row)
-                _pad_row(row_copy, period_idx + 1)
-                row_copy[period_idx] = period_name
-                archive.append(row_copy)
                 continue
 
             hours = self._sum_period_hours(timesheet_id, start_date, end_date, period_name)
             if hours <= 0:
-                row_copy = list(row)
-                _pad_row(row_copy, period_idx + 1)
-                row_copy[period_idx] = period_name
-                archive.append(row_copy)
                 continue
 
             cl_rate = float(sp.external_rate)

@@ -307,6 +307,93 @@ class TestProjectStorage:
         assert values[2][cost_idx] == "1200.0"
         assert values[2][period_idx] == "Aug 2026"
 
+    def test_archive_current_period_excludes_empty_timesheet(self, project_storage, mock_sheets):
+        from datetime import datetime, timezone
+
+        from feptm.models.specialist import Specialist
+
+        sp_no_ts = Specialist(
+            name="Jane", role="QA", timesheet="",
+            internal_rate="80", external_rate="100",
+        )
+        sp_with_ts = Specialist(
+            name="John", role="Dev", timesheet="ts-1",
+            internal_rate="100", external_rate="120",
+        )
+        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
+        cp_values = [
+            ["Specialist", "Hours Worked", "Total Cost (USD)"],
+            ["Jane", "", ""],
+            ["John", "", ""],
+        ]
+        sheet_dict = {"properties": {"sheetId": 1}}
+        cp_data = (cp_values, headers, sheet_dict)
+
+        project_storage._list_sheet_titles = MagicMock(return_value=[])
+        project_storage._read_current_period = MagicMock(return_value=cp_data)
+        project_storage._sum_period_hours = MagicMock(return_value=10.0)
+
+        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
+
+        result = project_storage.archive_current_period(
+            "spreadsheet-id", "Aug 2026", [sp_no_ts, sp_with_ts], start, end,
+        )
+
+        assert result is True
+        update_call = mock_sheets.update_range.call_args
+        values = update_call[1]["values"]
+
+        assert len(values) == 3
+        assert "Jane" not in [row[0] for row in values[1:]]
+        assert values[1][0] == "John"
+        assert values[2][0] == ""
+
+    def test_archive_current_period_excludes_zero_hours(self, project_storage, mock_sheets):
+        from datetime import datetime, timezone
+
+        from feptm.models.specialist import Specialist
+
+        sp_zero = Specialist(
+            name="Anna", role="Dev", timesheet="ts-1",
+            internal_rate="100", external_rate="120",
+        )
+        sp_has_hours = Specialist(
+            name="John", role="Dev", timesheet="ts-2",
+            internal_rate="100", external_rate="120",
+        )
+        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
+        cp_values = [
+            ["Specialist", "Hours Worked", "Total Cost (USD)"],
+            ["Anna", "", ""],
+            ["John", "", ""],
+        ]
+        sheet_dict = {"properties": {"sheetId": 1}}
+        cp_data = (cp_values, headers, sheet_dict)
+
+        project_storage._list_sheet_titles = MagicMock(return_value=[])
+        project_storage._read_current_period = MagicMock(return_value=cp_data)
+
+        def sum_hours(ts_id, s, e, p):
+            return 0.0 if ts_id == "ts-1" else 10.0
+        project_storage._sum_period_hours = MagicMock(side_effect=sum_hours)
+
+        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
+
+        result = project_storage.archive_current_period(
+            "spreadsheet-id", "Aug 2026", [sp_zero, sp_has_hours], start, end,
+        )
+
+        assert result is True
+        update_call = mock_sheets.update_range.call_args
+        values = update_call[1]["values"]
+
+        assert len(values) == 3
+        assert "Anna" not in [row[0] for row in values[1:]]
+        assert values[1][0] == "John"
+        assert values[2][0] == ""
+
 
 class TestProjectServiceFacade:
 
