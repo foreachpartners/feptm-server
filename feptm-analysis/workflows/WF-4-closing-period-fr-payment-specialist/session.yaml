@@ -19,6 +19,7 @@ sessions:
   plan6: SID-1786459813-2a627910
   implement8: SID-1786459972-f2a0f9c2
   finalize3: SID-1786462338-67977389
+  finalize4: SID-1786475498-2fd89495
 fr_ids:
 - FR-PAYMENT-001
 repos:

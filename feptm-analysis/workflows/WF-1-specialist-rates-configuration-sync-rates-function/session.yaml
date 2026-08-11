@@ -7,6 +7,7 @@ sessions:
   implement_fix: SID-1786217502-aa4fa8dc
   finalize: SID-1786214619-fb335b5e
   finalize_fix: SID-1786217932-6220109b
+  finalize_2: SID-1786475168-d6ac99f1
 description: Update specialist rates configuration for the sync-rates functionality
 fr_ids:
 - FR-SYNC-RATES-001

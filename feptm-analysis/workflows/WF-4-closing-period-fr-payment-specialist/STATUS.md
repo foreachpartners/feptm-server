@@ -19,3 +19,4 @@
 | 9 | plan.md | tasks.md | 2026-08-11 | 3/3 done (total cost + skip summary), 0 ERR, 0 WARN |
 | 10 | plan.md | tasks.md | 2026-08-11 | 3/3 done (computed summary row), 0 ERR, 0 WARN |
 | 11 | archive/plan-007.md | archive/tasks-007.md | 2026-08-11 | finalized |
+| 12 | archive/plan-008.md | archive/tasks-008.md | 2026-08-11 | finalized: 3/3 done, verification passed |
