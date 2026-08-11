@@ -395,6 +395,39 @@ class TestProjectStorage:
         assert values[2][0] == ""
 
 
+class TestSerialToDate:
+
+    def test_accepts_dd_mm_yyyy(self):
+        from feptm.storage.project_storage import _serial_to_date
+
+        result = _serial_to_date("01.02.2026")
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 2
+        assert result.day == 1
+
+    def test_rejects_yyyy_mm_dd(self):
+        from feptm.storage.project_storage import _serial_to_date
+
+        assert _serial_to_date("2026-02-01") is None
+
+    def test_rejects_mm_dd_yyyy(self):
+        from feptm.storage.project_storage import _serial_to_date
+
+        assert _serial_to_date("02/01/2026") is None
+
+    def test_rejects_numeric_serial(self):
+        from feptm.storage.project_storage import _serial_to_date
+
+        assert _serial_to_date(45000) is None
+
+    def test_rejects_empty(self):
+        from feptm.storage.project_storage import _serial_to_date
+
+        assert _serial_to_date("") is None
+        assert _serial_to_date(None) is None
+
+
 class TestProjectServiceFacade:
 
     def test_create_project(self, project_service, mock_sheets):

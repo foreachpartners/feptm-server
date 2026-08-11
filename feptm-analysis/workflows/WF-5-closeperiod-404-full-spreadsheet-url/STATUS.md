@@ -14,3 +14,5 @@
 | 4 | plan.md | tasks.md | 2026-08-11 | Planned: 3 tasks (exclude empty-timesheet specialists from archive) |
 | 5 | — | — | 2026-08-11 | 2/2 done, 0 ERR, 0 WARN |
 | 6 | archive/plan-002.md | archive/tasks-002.md | 2026-08-11 | finalize: exclude empty-timesheet and zero-hour specialists from archive |
+| 7 | plan.md | tasks.md | 2026-08-11 | Planned: 5 tasks (strict DD.MM.YYYY date format enforcement) |
+| 8 | archive/plan-003.md | archive/tasks-003.md | 2026-08-11 | finalize: 5/5 done, 0 ERR, 0 WARN |

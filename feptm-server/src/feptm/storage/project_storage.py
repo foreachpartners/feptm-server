@@ -512,7 +512,13 @@ class ProjectStorage:
             date_val = row[date_col]
             parsed = _serial_to_date(date_val)
             if parsed is None:
-                continue
+                log.error(
+                    "Invalid date format in timesheet %s row %d: %s (expected DD.MM.YYYY)",
+                    timesheet_id, i + 1, date_val,
+                )
+                raise Exception(
+                    f"Invalid date format in timesheet {timesheet_id} row {i+1}: {date_val!r} (expected DD.MM.YYYY)"
+                )
             if parsed < start_date or parsed > end_date:
                 continue
             period_cell = row[period_col] if len(row) > period_col else ""
@@ -795,7 +801,13 @@ class ProjectStorage:
                 continue
             parsed = _serial_to_date(row[date_col])
             if parsed is None:
-                continue
+                log.error(
+                    "Invalid date format in timesheet %s row %d: %s (expected DD.MM.YYYY)",
+                    timesheet_id, i + 1, row[date_col],
+                )
+                raise Exception(
+                    f"Invalid date format in timesheet {timesheet_id} row {i+1}: {row[date_col]!r} (expected DD.MM.YYYY)"
+                )
             if parsed < start_date or parsed > end_date:
                 continue
             if period_col is not None:
@@ -865,24 +877,6 @@ def _spreadsheet_title(project_name: str, key: str) -> str:
     return titles.get(key, f"{project_name} - {key}")
 
 
-_GSHEETS_EPOCH = datetime(1899, 12, 30)
-
-_RUSSIAN_MONTHS = {
-    "янв": 1, "январь": 1, "января": 1,
-    "фев": 2, "февр": 2, "февраль": 2, "февраля": 2,
-    "мар": 3, "март": 3, "марта": 3,
-    "апр": 4, "апрель": 4, "апреля": 4,
-    "май": 5, "мая": 5,
-    "июн": 6, "июнь": 6, "июня": 6,
-    "июл": 7, "июль": 7, "июля": 7,
-    "авг": 8, "август": 8, "августа": 8,
-    "сен": 9, "сент": 9, "сентябрь": 9, "сентября": 9,
-    "окт": 10, "октябрь": 10, "октября": 10,
-    "ноя": 11, "нояб": 11, "ноябрь": 11, "ноября": 11,
-    "дек": 12, "декабрь": 12, "декабря": 12,
-}
-
-
 def _find_column_contains(headers: list[str], needle: str) -> int | None:
     needle_lower = needle.lower()
     for i, header in enumerate(headers):
@@ -911,43 +905,13 @@ def _parse_rate_from_row(
 
 
 def _serial_to_date(value: Any) -> datetime | None:
-    if isinstance(value, (int, float)) and value > 0:
-        return (_GSHEETS_EPOCH + timedelta(days=int(value))).replace(
-            tzinfo=timezone.utc
-        )
     if isinstance(value, str) and value.strip():
-        val = value.strip()
-        for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%b %d, %Y"):
-            try:
-                return datetime.strptime(val, fmt).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-        parsed = _parse_russian_date(val)
-        if parsed is not None:
-            return parsed.replace(tzinfo=timezone.utc)
-    return None
-
-
-def _parse_russian_date(val: str) -> datetime | None:
-    import re
-
-    cleaned = re.sub(r"[,\s]+", " ", val).strip()
-    parts = cleaned.split()
-    if len(parts) < 3:
-        return None
-
-    for i, part in enumerate(parts):
-        month_name = part.rstrip(".").lower()
-        if month_name in _RUSSIAN_MONTHS:
-            month = _RUSSIAN_MONTHS[month_name]
-            day_part = parts[0] if i > 0 else parts[1]
-            year_part = parts[-1]
-            try:
-                day = int(day_part)
-                year = int(year_part)
-                return datetime(year, month, day)
-            except (ValueError, IndexError):
-                return None
+        try:
+            return datetime.strptime(value.strip(), "%d.%m.%Y").replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            pass
     return None
 
 
