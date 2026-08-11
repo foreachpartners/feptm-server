@@ -1,0 +1,19 @@
+id: FR-SPECIALIST-002
+title: Reject duplicate specialist names in Team
+description: |
+  During sync, the system rejects subsequent Team rows with the same specialist
+  name, logs an error, and continues processing the remaining rows.
+priority: must
+
+acceptance_criteria:
+  - "Before comparison, the system removes leading and trailing whitespace from names; comparison remains case-sensitive and preserves internal whitespace."
+  - "The system processes the first row with a name normally and treats subsequent rows with the same name as duplicates."
+  - "For a duplicate, the system does not create a personal timesheet or write a Timesheet ID to Team."
+  - "For a duplicate, the system does not create a specialist tab or add a Current Period row in report or calculation spreadsheets."
+  - "When rejecting a duplicate, the system logs an error containing the specialist name and the row numbers of the first and rejected entries."
+  - "Rejecting a duplicate does not interrupt synchronization of the remaining Team rows."
+  - "Repeated sync rejects the duplicate while its name remains non-unique."
+implements:
+  - src/feptm/api/v1/projects.py::sync_project_specialists
+  - src/feptm/api/v1/projects.py::sync_project_rates
+  - src/feptm/timesheets/project_service.py
