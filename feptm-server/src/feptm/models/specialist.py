@@ -17,7 +17,6 @@ class Specialist(BaseModel):
     date: datetime | None = Field(default_factory=lambda: datetime.now(UTC))
     timesheet: str | None = None
     row_index: int | None = None
-    display_name: str = ""
 
     model_config = ConfigDict(json_schema_extra={
         "example": {

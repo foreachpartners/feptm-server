@@ -1,17 +1,8 @@
-created: '2026-08-09'
+created: '2026-08-11'
 repos:
   feptm-analysis:
     findings: []
     orphans: []
   feptm-server:
-    findings:
-    - ar_spec: AR-DATA-001
-      check: specialist-model-row-index
-      message: 'ERR: Specialist model missing row_index field'
-      severity: error
-    - ar_spec: AR-DATA-001
-      check: no-name-only-team-write
-      message: 'WARN: src/feptm/storage/specialist_storage.py:182: Name-only row lookup
-        in Team sheet -- use row_index for precise targeting'
-      severity: warn
+    findings: []
     orphans: []

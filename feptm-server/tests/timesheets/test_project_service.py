@@ -1,6 +1,6 @@
 """Tests for project storage and facade."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -362,7 +362,8 @@ class TestProjectServiceFacade:
         mock_add.assert_not_called()
         mock_update.assert_not_called()
 
-    def test_sync_resolves_display_names_on_collision(self, project_service):
+    def test_sync_rates_aborts_on_duplicate_names(self, project_service):
+
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -393,12 +394,17 @@ class TestProjectServiceFacade:
         project_service._projects.add_specialist_to_report = mock_add
         project_service._projects.sync_rates_to_current_period = mock_update
 
-        project_service.sync_project_rates("test-project-id")
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            result = project_service.sync_project_rates("test-project-id")
 
-        assert sp1.display_name == "John Smith (2)"
-        assert sp2.display_name == "John Smith (3)"
+        assert result == ([], 0)
+        mock_log.error.assert_called_once()
+        assert "Duplicate specialist names" in mock_log.error.call_args[0][0]
+        assert "John Smith" in mock_log.error.call_args[0][1]
+        mock_add.assert_not_called()
+        mock_update.assert_not_called()
 
-    def test_sync_no_collision_preserves_name(self, project_service):
+    def test_sync_no_collision_proceeds_normally(self, project_service):
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -426,18 +432,23 @@ class TestProjectServiceFacade:
         project_service._projects.add_specialist_to_report = mock_add
         project_service._projects.sync_rates_to_current_period = mock_update
 
-        project_service.sync_project_rates("test-project-id")
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            result = project_service.sync_project_rates("test-project-id")
 
-        assert sp1.display_name == "John"
-        assert sp2.display_name == "Jane"
+        assert result[1] == 2
+        mock_log.error.assert_not_called()
+        assert mock_add.call_count == 2
+        assert mock_update.call_count == 2
 
-    def test_sync_duplicate_names_passes_display_name_to_storage(self, project_service):
+    def test_sync_aborts_on_duplicate_names(self, project_service):
+
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
         project = Project(
             name="Test Project",
             drive_folder_id="folder-id",
+            project_info_spreadsheet_id="info-id",
             report_spreadsheet_id="report-id",
         )
         project_service._projects.get_project_metadata = MagicMock(
@@ -457,13 +468,17 @@ class TestProjectServiceFacade:
         mock_add = MagicMock()
         mock_update = MagicMock()
         project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.update_current_period = mock_update
 
-        project_service.sync_project_rates("test-project-id")
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            result = project_service.sync_project_specialists("test-project-id")
 
-        assert mock_add.call_count == 2
-        assert mock_add.call_args_list[0][0][1].display_name == "Sam (2)"
-        assert mock_add.call_args_list[1][0][1].display_name == "Sam (3)"
+        assert result == ([], 0, 0)
+        mock_log.error.assert_called_once()
+        assert "Duplicate specialist names" in mock_log.error.call_args[0][0]
+        assert "Sam" in mock_log.error.call_args[0][1]
+        mock_add.assert_not_called()
+        mock_update.assert_not_called()
 
     def test_close_period_matching_entries(self, project_service):
         from datetime import datetime, timezone

@@ -206,7 +206,7 @@ class ProjectStorage:
         specialist: Specialist,
         import_formula: str,
     ) -> None:
-        tab_name = specialist.display_name or specialist.name
+        tab_name = specialist.name
         existing = self._list_sheet_titles(spreadsheet_id)
         if tab_name not in existing:
             self._sheets.batch_update(
@@ -234,8 +234,8 @@ class ProjectStorage:
 
         values, headers, sheet = sheet_data
 
-        if _specialist_in_sheet(values, headers, specialist.display_name or specialist.name, self._sheets):
-            log.info("Specialist %s already exists in Current Period", specialist.display_name or specialist.name)
+        if _specialist_in_sheet(values, headers, specialist.name, self._sheets):
+            log.info("Specialist %s already exists in Current Period", specialist.name)
             return
 
         insert_row, should_insert = _find_insert_position(values, headers, self._sheets)
@@ -264,7 +264,7 @@ class ProjectStorage:
             return
         values, headers, _ = sheet_data
         target_row = _find_specialist_row(
-            values, headers, specialist.display_name or specialist.name, self._sheets
+            values, headers, specialist.name, self._sheets
         )
         if target_row is None:
             return
@@ -559,16 +559,13 @@ class ProjectStorage:
         values, headers, _ = cp_data
 
         sp_map = {
-            sp.display_name or sp.name: sp
+            sp.name: sp
             for sp in specialists
             if sp.timesheet
         }
 
         archive = [list(headers)]
         num_cols = len(headers)
-        seen_bases: set[str] = set()
-
-        import re
 
         for row in values[1:]:
             _pad_row(row, num_cols)
@@ -576,23 +573,8 @@ class ProjectStorage:
 
             sp = sp_map.get(sp_name)
             if sp is None:
-                base = re.sub(r"\s+\(\d+\)$", "", sp_name)
-                if base != sp_name:
-                    sp = sp_map.get(base)
-
-            if sp is None:
                 archive.append(list(row))
                 continue
-
-            canonical = sp.display_name or sp.name or sp_name
-            base_name = re.sub(r"\s+\(\d+\)$", "", canonical)
-            if base_name in seen_bases:
-                continue
-
-            if canonical != sp_name:
-                sp_name = canonical
-                _pad_row(row, 1)
-                row[0] = canonical
 
             timesheet_id = sp.timesheet or ""
             if not timesheet_id:
@@ -603,8 +585,6 @@ class ProjectStorage:
             if hours <= 0:
                 archive.append(list(row))
                 continue
-
-            seen_bases.add(base_name)
 
             cl_rate = float(sp.external_rate)
             sp_rate = float(sp.internal_rate)
@@ -1070,7 +1050,7 @@ def _write_specialist_fields(
     headers: list[str],
 ) -> None:
     field_updates = [
-        (ColumnName.SPECIALIST.value, specialist.display_name or specialist.name),
+        (ColumnName.SPECIALIST.value, specialist.name),
         (ColumnName.SPECIALIST_ROLE.value, specialist.role),
         (ColumnName.HOURLY_RATE_USD.value, str(specialist.external_rate)),
         (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(specialist.internal_rate)),

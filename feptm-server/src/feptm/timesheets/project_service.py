@@ -1,6 +1,5 @@
 """Service for handling project timesheets and related operations."""
 
-from collections import Counter
 from datetime import UTC, datetime
 
 from feptm.core.log import log
@@ -15,13 +14,29 @@ from feptm.storage.protocols import (
 )
 
 
-def _resolve_display_names(specialists: list[Specialist]) -> None:
-    name_counts = Counter(sp.name for sp in specialists if sp.name)
+def _has_duplicate_names(specialists: list[Specialist]) -> bool:
+    name_rows: dict[str, list[int]] = {}
     for sp in specialists:
-        if name_counts.get(sp.name, 0) > 1 and sp.row_index is not None:
-            sp.display_name = f"{sp.name} ({sp.row_index})"
-        else:
-            sp.display_name = sp.name
+        if not sp.name:
+            continue
+        ri = sp.row_index or 0
+        if sp.name not in name_rows:
+            name_rows[sp.name] = []
+        name_rows[sp.name].append(ri)
+
+    dups = {n: rows for n, rows in name_rows.items() if len(rows) > 1}
+    if dups:
+        dup_detail = ", ".join(
+            f"'{name}' (rows: {', '.join(str(r) for r in rows)})"
+            for name, rows in dups.items()
+        )
+        log.error(
+            "Duplicate specialist names found in Team sheet: %s. "
+            "Aborting sync — rename the duplicates in the Team sheet to resolve.",
+            dup_detail,
+        )
+        return True
+    return False
 
 
 class TimesheetProjectService:
@@ -81,7 +96,8 @@ class TimesheetProjectService:
         if not specialists:
             return [], 0, 0
 
-        _resolve_display_names(specialists)
+        if _has_duplicate_names(specialists):
+            return [], 0, 0
 
         new_count = 0
         for sp in specialists:
@@ -142,7 +158,8 @@ class TimesheetProjectService:
         if not specialists:
             return [], 0
 
-        _resolve_display_names(specialists)
+        if _has_duplicate_names(specialists):
+            return [], 0
 
         created_count = 0
         for sp in specialists:
@@ -190,7 +207,16 @@ class TimesheetProjectService:
         project = self._projects.get_project_metadata(project_id)
         specialists, _ = self._specialists.list_from_sheet(project_id)
 
-        _resolve_display_names(specialists)
+        if _has_duplicate_names(specialists):
+            return ClosePeriodResponse(
+                created=datetime.now(UTC),
+                project_id=project_id,
+                period_name=period_name,
+                entries_updated=0,
+                specialists_processed=0,
+                report_archived=False,
+                calculations_archived=False,
+            )
 
         total_entries = 0
         specialists_processed = 0
