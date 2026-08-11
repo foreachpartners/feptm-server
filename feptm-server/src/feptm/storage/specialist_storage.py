@@ -157,7 +157,8 @@ class SpecialistStorage:
         external_rate = _parse_decimal(
             row, hmap.get("external_rate"), name, "external rate"
         )
-        timesheet = _opt(row, hmap.get("timesheet"))
+        timesheet_raw = _opt(row, hmap.get("timesheet"))
+        timesheet = utils.extract_id_from_hyperlink_formula(timesheet_raw or "") or timesheet_raw
 
         return Specialist(
             name=name,

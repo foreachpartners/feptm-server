@@ -565,7 +565,13 @@ class ProjectStorage:
         }
 
         archive = [list(headers)]
-        num_cols = len(headers)
+
+        period_idx = _find_column_contains(headers, ColumnName.PERIOD.value)
+        if period_idx is None:
+            archive[0].append(ColumnName.PERIOD.value)
+            period_idx = len(archive[0]) - 1
+
+        num_cols = len(archive[0])
 
         for row in values[1:]:
             _pad_row(row, num_cols)
@@ -573,17 +579,26 @@ class ProjectStorage:
 
             sp = sp_map.get(sp_name)
             if sp is None:
-                archive.append(list(row))
+                row_copy = list(row)
+                _pad_row(row_copy, period_idx + 1)
+                row_copy[period_idx] = period_name
+                archive.append(row_copy)
                 continue
 
             timesheet_id = sp.timesheet or ""
             if not timesheet_id:
-                archive.append(list(row))
+                row_copy = list(row)
+                _pad_row(row_copy, period_idx + 1)
+                row_copy[period_idx] = period_name
+                archive.append(row_copy)
                 continue
 
             hours = self._sum_timesheet_hours(timesheet_id, start_date, end_date)
             if hours <= 0:
-                archive.append(list(row))
+                row_copy = list(row)
+                _pad_row(row_copy, period_idx + 1)
+                row_copy[period_idx] = period_name
+                archive.append(row_copy)
                 continue
 
             cl_rate = float(sp.external_rate)
@@ -605,6 +620,8 @@ class ProjectStorage:
                 if col_idx is not None:
                     _pad_row(new_row, col_idx + 1)
                     new_row[col_idx] = val
+            _pad_row(new_row, period_idx + 1)
+            new_row[period_idx] = period_name
             archive.append(new_row)
 
         self._sheets.batch_update(

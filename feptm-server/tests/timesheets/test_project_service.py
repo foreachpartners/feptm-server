@@ -250,6 +250,45 @@ class TestProjectStorage:
             value_input_option="USER_ENTERED",
         )
 
+    def test_archive_current_period_writes_period_column(self, project_storage, mock_sheets):
+        from datetime import datetime, timezone
+
+        from feptm.models.specialist import Specialist
+
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1",
+            internal_rate="100", external_rate="120",
+        )
+        headers = ["Specialist", "Hours Worked"]
+        cp_values = [
+            ["Specialist", "Hours Worked"],
+            ["John", ""],
+        ]
+        sheet_dict = {"properties": {"sheetId": 1}}
+        cp_data = (cp_values, headers, sheet_dict)
+
+        project_storage._list_sheet_titles = MagicMock(return_value=[])
+        project_storage._read_current_period = MagicMock(return_value=cp_data)
+        project_storage._sum_timesheet_hours = MagicMock(return_value=10.0)
+
+        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
+
+        result = project_storage.archive_current_period(
+            "spreadsheet-id", "Aug 2026", [sp], start, end,
+        )
+
+        assert result is True
+
+        update_call = mock_sheets.update_range.call_args
+        values = update_call[1]["values"]
+
+        assert "Period" in values[0]
+        period_idx = values[0].index("Period")
+
+        for row in values[1:]:
+            assert row[period_idx] == "Aug 2026"
+
 
 class TestProjectServiceFacade:
 

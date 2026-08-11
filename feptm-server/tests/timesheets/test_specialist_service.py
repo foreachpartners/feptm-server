@@ -91,6 +91,34 @@ class TestSpecialistStorage:
         specialists, existing = specialist_storage.list_from_sheet("test-id", "Team")
         assert specialists == []
 
+    def test_parse_row_extracts_timesheet_id_from_url(self, specialist_storage, mock_sheets):
+        headers = SAMPLE_HEADERS
+        data = [
+            headers,
+            ["John Doe", "Lead Developer", "Project Alpha", "100", "120",
+             "Jan 15, 2024", "https://docs.google.com/spreadsheets/d/abcd1234/edit"],
+        ]
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        specialists, _ = specialist_storage.list_from_sheet("test-id", "Team")
+
+        assert len(specialists) == 1
+        assert specialists[0].timesheet == "abcd1234"
+
+    def test_parse_row_preserves_plain_timesheet_id(self, specialist_storage, mock_sheets):
+        headers = SAMPLE_HEADERS
+        data = [
+            headers,
+            ["John Doe", "Lead Developer", "Project Alpha", "100", "120",
+             "Jan 15, 2024", "plain-id-123"],
+        ]
+        mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+
+        specialists, _ = specialist_storage.list_from_sheet("test-id", "Team")
+
+        assert len(specialists) == 1
+        assert specialists[0].timesheet == "plain-id-123"
+
     def test_create_timesheet_success(self, specialist_storage, mock_sheets):
         mock_sheets.find_file_in_folder.return_value = None
         mock_sheets.ensure_spreadsheet_from_template.return_value = TIMESHEET_RESULT

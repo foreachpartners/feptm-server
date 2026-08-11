@@ -40,6 +40,7 @@ class ColumnName(Enum):
     WORK_HOURS = "Work Hours"
     PAYMENT_PERIOD = "Payment Period"
     PAYMENT_STATUS = "Payment Status"
+    PERIOD = "Period"
 
 
 class DateFormat(Enum):
