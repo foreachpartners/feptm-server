@@ -572,6 +572,7 @@ class ProjectStorage:
             period_idx = len(archive[0]) - 1
 
         num_cols = len(archive[0])
+        archive_data: list[tuple[float, float, float, float]] = []
 
         for row in values[1:]:
             _pad_row(row, num_cols)
@@ -593,7 +594,7 @@ class ProjectStorage:
                 archive.append(row_copy)
                 continue
 
-            hours = self._sum_timesheet_hours(timesheet_id, start_date, end_date)
+            hours = self._sum_period_hours(timesheet_id, start_date, end_date, period_name)
             if hours <= 0:
                 row_copy = list(row)
                 _pad_row(row_copy, period_idx + 1)
@@ -615,6 +616,7 @@ class ProjectStorage:
                 (ColumnName.CLIENT_WORK_COST_USD.value, str(cl_cost)),
                 (ColumnName.SPECIALIST_WORK_COST_USD.value, str(sp_cost)),
                 (ColumnName.REVENUE_USD.value, str(revenue)),
+                (ColumnName.TOTAL_COST_USD.value, str(cl_cost)),
             ]:
                 col_idx = _find_column_contains(headers, col_name)
                 if col_idx is not None:
@@ -623,6 +625,28 @@ class ProjectStorage:
             _pad_row(new_row, period_idx + 1)
             new_row[period_idx] = period_name
             archive.append(new_row)
+            archive_data.append((hours, cl_cost, sp_cost, revenue))
+
+        if archive_data:
+            total_h = sum(h[0] for h in archive_data)
+            total_cl = sum(h[1] for h in archive_data)
+            total_sp = sum(h[2] for h in archive_data)
+            total_r = sum(h[3] for h in archive_data)
+
+            summary = [""] * num_cols
+            for col_name, val in [
+                (ColumnName.HOURS_WORKED.value, str(total_h)),
+                (ColumnName.CLIENT_WORK_COST_USD.value, str(total_cl)),
+                (ColumnName.SPECIALIST_WORK_COST_USD.value, str(total_sp)),
+                (ColumnName.TOTAL_COST_USD.value, str(total_cl)),
+                (ColumnName.REVENUE_USD.value, str(total_r)),
+            ]:
+                col_idx = _find_column_contains(headers, col_name)
+                if col_idx is not None:
+                    _pad_row(summary, col_idx + 1)
+                    summary[col_idx] = val
+            summary[period_idx] = period_name
+            archive.append(summary)
 
         self._sheets.batch_update(
             spreadsheet_id=spreadsheet_id,
@@ -719,11 +743,12 @@ class ProjectStorage:
             log.warning("Failed to extract timesheet ID from tab %s: %s", tab_name, exc)
             return None
 
-    def _sum_timesheet_hours(
+    def _sum_period_hours(
         self,
         timesheet_id: str,
         start_date: datetime,
         end_date: datetime,
+        period_name: str,
     ) -> float:
         if not self._sheets.sheets_service:
             return 0.0
@@ -760,19 +785,32 @@ class ProjectStorage:
         date_col = self._sheets.find_column_index(headers, [ColumnName.DATE.value])
         hours_col = self._sheets.find_column_index(headers, [ColumnName.WORK_HOURS.value])
 
+        max_col = max(date_col or 0, hours_col or 0)
         if date_col is None or hours_col is None:
             return 0.0
+
+        period_col = self._sheets.find_column_index(
+            headers, [ColumnName.PAYMENT_PERIOD.value]
+        )
+        if period_col is None:
+            period_col = _find_column_contains(headers, ColumnName.PAYMENT_PERIOD.value)
+        if period_col is not None:
+            max_col = max(max_col, period_col)
 
         total = 0.0
         for i in range(1, len(values)):
             row = values[i]
-            if len(row) <= max(date_col, hours_col):
+            if len(row) <= max_col:
                 continue
             parsed = _serial_to_date(row[date_col])
             if parsed is None:
                 continue
             if parsed < start_date or parsed > end_date:
                 continue
+            if period_col is not None:
+                period_val = row[period_col] if len(row) > period_col else ""
+                if str(period_val).strip() != period_name:
+                    continue
             try:
                 total += float(row[hours_col] or 0)
             except (ValueError, TypeError):

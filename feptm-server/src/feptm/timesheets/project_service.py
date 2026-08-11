@@ -262,6 +262,18 @@ class TimesheetProjectService:
                         payment_status_col_idx=5,
                     )
 
+        active_names = {sp.name for sp in specialists}
+        if project.report_spreadsheet_id:
+            removed = self._projects.remove_stale_specialists(
+                project.report_spreadsheet_id, active_names
+            )
+            log.info("Removed %d stale specialists from report Current Period", removed)
+        if project.calculations_spreadsheet_id:
+            removed = self._projects.remove_stale_specialists(
+                project.calculations_spreadsheet_id, active_names
+            )
+            log.info("Removed %d stale specialists from calculations Current Period", removed)
+
         log.info(
             "Closed period %s: %d entries updated, %d specialists processed",
             period_name,

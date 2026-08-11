@@ -16,6 +16,13 @@ def mock_sheets():
     mock.is_initialized.return_value = True
     mock.sheets_service = MagicMock()
     mock.drive_service = MagicMock()
+    mock.find_column_index.side_effect = (
+        lambda headers, names: next(
+            (i for i, h in enumerate(headers)
+             if h.strip().lower() in (n.lower() for n in names)),
+            None,
+        )
+    )
     return mock
 
 
@@ -259,17 +266,17 @@ class TestProjectStorage:
             name="John", role="Dev", timesheet="ts-1",
             internal_rate="100", external_rate="120",
         )
-        headers = ["Specialist", "Hours Worked"]
+        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
         cp_values = [
-            ["Specialist", "Hours Worked"],
-            ["John", ""],
+            ["Specialist", "Hours Worked", "Total Cost (USD)"],
+            ["John", "", ""],
         ]
         sheet_dict = {"properties": {"sheetId": 1}}
         cp_data = (cp_values, headers, sheet_dict)
 
         project_storage._list_sheet_titles = MagicMock(return_value=[])
         project_storage._read_current_period = MagicMock(return_value=cp_data)
-        project_storage._sum_timesheet_hours = MagicMock(return_value=10.0)
+        project_storage._sum_period_hours = MagicMock(return_value=10.0)
 
         start = datetime(2026, 8, 1, tzinfo=timezone.utc)
         end = datetime(2026, 8, 31, tzinfo=timezone.utc)
@@ -279,15 +286,26 @@ class TestProjectStorage:
         )
 
         assert result is True
+        project_storage._sum_period_hours.assert_called_once_with(
+            "ts-1", start, end, "Aug 2026"
+        )
 
         update_call = mock_sheets.update_range.call_args
         values = update_call[1]["values"]
 
+        assert len(values) == 3
         assert "Period" in values[0]
         period_idx = values[0].index("Period")
+        cost_idx = values[0].index("Total Cost (USD)")
+        hours_idx = values[0].index("Hours Worked")
 
-        for row in values[1:]:
-            assert row[period_idx] == "Aug 2026"
+        assert values[1][period_idx] == "Aug 2026"
+        assert values[1][cost_idx] == "1200.0"
+
+        assert values[2][0] == ""
+        assert values[2][hours_idx] == "10.0"
+        assert values[2][cost_idx] == "1200.0"
+        assert values[2][period_idx] == "Aug 2026"
 
 
 class TestProjectServiceFacade:
@@ -547,6 +565,9 @@ class TestProjectServiceFacade:
             return_value=True
         )
         project_service._projects.protect_archived_sheet = MagicMock()
+        project_service._projects.remove_stale_specialists = MagicMock(
+            return_value=0
+        )
 
         result = project_service.close_period(
             "test-id",
@@ -561,6 +582,10 @@ class TestProjectServiceFacade:
         assert result.calculations_archived is True
         assert project_service._projects.archive_current_period.call_count == 2
         assert project_service._projects.protect_archived_sheet.call_count == 2
+        assert project_service._projects.remove_stale_specialists.call_count == 2
+        project_service._projects.remove_stale_specialists.assert_any_call(
+            "report-id", {"John"}
+        )
 
     def test_close_period_no_matching_entries(self, project_service):
         from datetime import datetime, timezone
@@ -587,6 +612,9 @@ class TestProjectServiceFacade:
         )
         project_service._projects.archive_current_period = MagicMock()
         project_service._projects.protect_archived_sheet = MagicMock()
+        project_service._projects.remove_stale_specialists = MagicMock(
+            return_value=0
+        )
 
         result = project_service.close_period(
             "test-id",
@@ -601,6 +629,9 @@ class TestProjectServiceFacade:
         assert result.calculations_archived is False
         project_service._projects.archive_current_period.assert_not_called()
         project_service._projects.protect_archived_sheet.assert_not_called()
+        project_service._projects.remove_stale_specialists.assert_called_once_with(
+            "report-id", {"John"}
+        )
 
     def test_close_period_no_timesheet_specialists(self, project_service):
         from datetime import datetime, timezone
