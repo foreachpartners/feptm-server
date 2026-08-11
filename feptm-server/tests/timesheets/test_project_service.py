@@ -300,11 +300,11 @@ class TestProjectStorage:
         hours_idx = values[0].index("Hours Worked")
 
         assert values[1][period_idx] == "Aug 2026"
-        assert values[1][cost_idx] == "1200.0"
+        assert values[1][cost_idx] == 1200.0
 
         assert values[2][0] == ""
-        assert values[2][hours_idx] == "10.0"
-        assert values[2][cost_idx] == "1200.0"
+        assert values[2][hours_idx] == 10.0
+        assert values[2][cost_idx] == 1200.0
         assert values[2][period_idx] == "Aug 2026"
 
     def test_archive_current_period_excludes_empty_timesheet(self, project_storage, mock_sheets):
@@ -416,10 +416,14 @@ class TestSerialToDate:
 
         assert _serial_to_date("02/01/2026") is None
 
-    def test_rejects_numeric_serial(self):
+    def test_accepts_numeric_serial(self):
         from feptm.storage.project_storage import _serial_to_date
 
-        assert _serial_to_date(45000) is None
+        result = _serial_to_date(46054)   # 2026-02-01
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 2
+        assert result.day == 1
 
     def test_rejects_empty(self):
         from feptm.storage.project_storage import _serial_to_date

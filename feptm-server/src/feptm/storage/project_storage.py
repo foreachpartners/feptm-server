@@ -607,13 +607,13 @@ class ProjectStorage:
 
             new_row = list(row)
             for col_name, val in [
-                (ColumnName.HOURS_WORKED.value, str(hours)),
-                (ColumnName.CLIENT_HOURLY_RATE_USD.value, str(cl_rate)),
-                (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(sp_rate)),
-                (ColumnName.CLIENT_WORK_COST_USD.value, str(cl_cost)),
-                (ColumnName.SPECIALIST_WORK_COST_USD.value, str(sp_cost)),
-                (ColumnName.REVENUE_USD.value, str(revenue)),
-                (ColumnName.TOTAL_COST_USD.value, str(cl_cost)),
+                (ColumnName.HOURS_WORKED.value, hours),
+                (ColumnName.CLIENT_HOURLY_RATE_USD.value, cl_rate),
+                (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, sp_rate),
+                (ColumnName.CLIENT_WORK_COST_USD.value, cl_cost),
+                (ColumnName.SPECIALIST_WORK_COST_USD.value, sp_cost),
+                (ColumnName.REVENUE_USD.value, revenue),
+                (ColumnName.TOTAL_COST_USD.value, cl_cost),
             ]:
                 col_idx = _find_column_contains(headers, col_name)
                 if col_idx is not None:
@@ -630,13 +630,13 @@ class ProjectStorage:
             total_sp = sum(h[2] for h in archive_data)
             total_r = sum(h[3] for h in archive_data)
 
-            summary = [""] * num_cols
+            summary: list[Any] = [""] * num_cols
             for col_name, val in [
-                (ColumnName.HOURS_WORKED.value, str(total_h)),
-                (ColumnName.CLIENT_WORK_COST_USD.value, str(total_cl)),
-                (ColumnName.SPECIALIST_WORK_COST_USD.value, str(total_sp)),
-                (ColumnName.TOTAL_COST_USD.value, str(total_cl)),
-                (ColumnName.REVENUE_USD.value, str(total_r)),
+                (ColumnName.HOURS_WORKED.value, total_h),
+                (ColumnName.CLIENT_WORK_COST_USD.value, total_cl),
+                (ColumnName.SPECIALIST_WORK_COST_USD.value, total_sp),
+                (ColumnName.TOTAL_COST_USD.value, total_cl),
+                (ColumnName.REVENUE_USD.value, total_r),
             ]:
                 col_idx = _find_column_contains(headers, col_name)
                 if col_idx is not None:
@@ -877,6 +877,9 @@ def _spreadsheet_title(project_name: str, key: str) -> str:
     return titles.get(key, f"{project_name} - {key}")
 
 
+_GSHEETS_EPOCH = datetime(1899, 12, 30)
+
+
 def _find_column_contains(headers: list[str], needle: str) -> int | None:
     needle_lower = needle.lower()
     for i, header in enumerate(headers):
@@ -905,6 +908,10 @@ def _parse_rate_from_row(
 
 
 def _serial_to_date(value: Any) -> datetime | None:
+    if isinstance(value, (int, float)) and value > 0:
+        return (_GSHEETS_EPOCH + timedelta(days=int(value))).replace(
+            tzinfo=timezone.utc
+        )
     if isinstance(value, str) and value.strip():
         try:
             return datetime.strptime(value.strip(), "%d.%m.%Y").replace(
@@ -1081,9 +1088,9 @@ def _write_specialist_fields(
     field_updates = [
         (ColumnName.SPECIALIST.value, specialist.name),
         (ColumnName.SPECIALIST_ROLE.value, specialist.role),
-        (ColumnName.HOURLY_RATE_USD.value, str(specialist.external_rate)),
-        (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(specialist.internal_rate)),
-        (ColumnName.CLIENT_HOURLY_RATE_USD.value, str(specialist.external_rate)),
+        (ColumnName.HOURLY_RATE_USD.value, specialist.external_rate),
+        (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, specialist.internal_rate),
+        (ColumnName.CLIENT_HOURLY_RATE_USD.value, specialist.external_rate),
     ]
     requests: list[dict[str, Any]] = []
     row_index = target_row - 1
@@ -1091,6 +1098,11 @@ def _write_specialist_fields(
         col_idx = sheets.find_column_index(headers, [col_name])
         if col_idx is None:
             continue
+        if isinstance(val, str):
+            entry: dict[str, Any] = {"stringValue": val}
+        else:
+            entry = {"numberValue": float(val)}  # type: ignore[arg-type]
+        cell = {"userEnteredValue": entry}
         requests.append(
             {
                 "updateCells": {
@@ -1103,9 +1115,7 @@ def _write_specialist_fields(
                     },
                     "rows": [
                         {
-                            "values": [
-                                {"userEnteredValue": {"stringValue": str(val)}}
-                            ]
+                            "values": [cell]
                         }
                     ],
                     "fields": "userEnteredValue",
