@@ -461,6 +461,44 @@ class TestProjectServiceFacade:
         mock_add.assert_not_called()
         mock_update.assert_not_called()
 
+    def test_sync_aborts_on_invalid_dates(self, project_service):
+        from unittest.mock import patch
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            project_info_spreadsheet_id="info-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1",
+            row_index=2, date=None,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.update_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            result = project_service.sync_project_specialists("test-project-id")
+
+        assert result == ([], 0, 0)
+        mock_log.error.assert_called_once()
+        assert "invalid dates" in mock_log.error.call_args[0][0]
+        mock_add.assert_not_called()
+        mock_update.assert_not_called()
+
     def test_sync_no_collision_proceeds_normally(self, project_service):
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist

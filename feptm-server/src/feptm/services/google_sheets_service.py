@@ -693,7 +693,11 @@ class GoogleSheetsService:
             result = (
                 self.sheets_service.spreadsheets()
                 .values()
-                .get(spreadsheetId=spreadsheet_id, range=range_name)
+                .get(
+                    spreadsheetId=spreadsheet_id,
+                    range=range_name,
+                    valueRenderOption="UNFORMATTED_VALUE",
+                )
                 .execute()
             )
 

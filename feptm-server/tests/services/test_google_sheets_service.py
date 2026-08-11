@@ -324,7 +324,8 @@ def test_get_sheet_data_with_headers_success(mock_google_sheets_service):
     # Verify API calls - check that the correct range was requested
     values_resource.get.assert_called_once_with(
         spreadsheetId=spreadsheet_id,
-        range="TestSheet!A:D"
+        range="TestSheet!A:D",
+        valueRenderOption="UNFORMATTED_VALUE",
     )
 
 

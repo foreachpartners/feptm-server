@@ -1,6 +1,6 @@
 """Storage for specialist-scoped spreadsheet operations."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from feptm.core import utils
@@ -10,7 +10,6 @@ from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
 from feptm.timesheets.config_service import (
     ColumnName,
-    DateFormat,
     RangeFormat,
     SheetName,
 )
@@ -150,7 +149,15 @@ class SpecialistStorage:
             return None
 
         project = _opt(row, hmap.get("project"))
-        date_val = _parse_date(row, hmap.get("date"), name)
+        date_val = None
+        date_raw = _opt(row, hmap.get("date"))
+        if date_raw:
+            try:
+                date_val = _serial_from_number(float(date_raw))
+            except (ValueError, TypeError):
+                pass
+            if date_val is None:
+                log.error("Invalid date value for %s: %s", name, date_raw)
         internal_rate = _parse_decimal(
             row, hmap.get("internal_rate"), name, "internal rate"
         )
@@ -166,7 +173,7 @@ class SpecialistStorage:
             project=project,
             internal_rate=internal_rate,
             external_rate=external_rate,
-            date=date_val or datetime.utcnow(),
+            date=date_val,
             timesheet=timesheet,
             row_index=row_number,
         )
@@ -225,20 +232,20 @@ def _opt(row: list, idx: int | None) -> str | None:
     return None
 
 
-def _parse_date(row: list, idx: int | None, name: str) -> datetime | None:
-    if idx is not None and idx < len(row):
-        date_str = row[idx].strip()
-        if date_str:
-            parsed = utils.parse_date_safely(date_str, DateFormat.SHEET_DATE.value)
-            if parsed is None:
-                log.warning("Invalid date format for %s: %s", name, date_str)
-            return parsed
+_GSHEETS_EPOCH = datetime(1899, 12, 30)
+
+
+def _serial_from_number(value: int | float) -> datetime | None:
+    if isinstance(value, (int, float)) and value > 0:
+        return (_GSHEETS_EPOCH + timedelta(days=int(value))).replace(
+            tzinfo=None
+        )
     return None
 
 
 def _parse_decimal(row: list, idx: int | None, name: str, field: str) -> Any:
     if idx is not None and idx < len(row):
-        rate_str = row[idx].strip()
+        rate_str = str(row[idx]).strip()
         if rate_str:
             result = utils.parse_decimal_safely(rate_str)
             if result == 0 and rate_str != "0":

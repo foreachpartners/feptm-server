@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 
 def generate_uuid() -> str:
@@ -44,7 +45,7 @@ def format_date_range(start_date: datetime, end_date: datetime) -> str:
         return f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
 
 
-def parse_decimal_safely(value: str, default: Decimal = Decimal(0)) -> Decimal:
+def parse_decimal_safely(value: Any, default: Decimal = Decimal(0)) -> Decimal:
     """Parse string to Decimal safely.
 
     Args:
@@ -54,12 +55,15 @@ def parse_decimal_safely(value: str, default: Decimal = Decimal(0)) -> Decimal:
     Returns:
         Parsed Decimal value or default
     """
-    if not value or not value.strip():
+    if value is None:
+        return default
+    s = str(value).strip()
+    if not s:
         return default
 
     try:
         # Replace comma with dot for European number format
-        cleaned_value = value.strip().replace(",", ".")
+        cleaned_value = str(value).strip().replace(",", ".")
         return Decimal(cleaned_value)
     except (InvalidOperation, ValueError):
         return default
@@ -84,7 +88,7 @@ def parse_date_safely(value: str, date_format: str) -> datetime | None:
         return None
 
 
-def clean_string_value(value: str) -> str | None:
+def clean_string_value(value: Any) -> str | None:
     """Clean and validate string value.
 
     Args:
@@ -93,11 +97,8 @@ def clean_string_value(value: str) -> str | None:
     Returns:
         Cleaned string or None if empty
     """
-    if not value:
-        return None
-
-    cleaned = value.strip()
-    return cleaned if cleaned else None
+    s = str(value).strip()
+    return s if s else None
 
 
 def validate_required_fields(data: dict, required_fields: list[str]) -> list[str]:

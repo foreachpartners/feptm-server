@@ -39,6 +39,25 @@ def _has_duplicate_names(specialists: list[Specialist]) -> bool:
     return False
 
 
+def _has_invalid_dates(specialists: list[Specialist]) -> bool:
+    invalid = [
+        (sp.name, sp.row_index)
+        for sp in specialists
+        if sp.name and sp.date is None
+    ]
+    if invalid:
+        names = ", ".join(
+            f"'{n}' (row {r})" for n, r in invalid
+        )
+        log.error(
+            "Specialists with invalid dates in Team sheet: %s. "
+            "Aborting — fix date values in the Team sheet to resolve.",
+            names,
+        )
+        return True
+    return False
+
+
 class TimesheetProjectService:
     """Facade orchestrating project creation and specialist sync across storage."""
 
@@ -97,6 +116,9 @@ class TimesheetProjectService:
             return [], 0, 0
 
         if _has_duplicate_names(specialists):
+            return [], 0, 0
+
+        if _has_invalid_dates(specialists):
             return [], 0, 0
 
         new_count = 0
@@ -161,6 +183,9 @@ class TimesheetProjectService:
         if _has_duplicate_names(specialists):
             return [], 0
 
+        if _has_invalid_dates(specialists):
+            return [], 0
+
         created_count = 0
         for sp in specialists:
             if not sp.timesheet:
@@ -208,6 +233,17 @@ class TimesheetProjectService:
         specialists, _ = self._specialists.list_from_sheet(project_id)
 
         if _has_duplicate_names(specialists):
+            return ClosePeriodResponse(
+                created=datetime.now(UTC),
+                project_id=project_id,
+                period_name=period_name,
+                entries_updated=0,
+                specialists_processed=0,
+                report_archived=False,
+                calculations_archived=False,
+            )
+
+        if _has_invalid_dates(specialists):
             return ClosePeriodResponse(
                 created=datetime.now(UTC),
                 project_id=project_id,
