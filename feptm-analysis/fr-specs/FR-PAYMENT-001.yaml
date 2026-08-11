@@ -18,6 +18,7 @@ acceptance_criteria:
   - "In each specialist's personal timesheet, the system writes period_name to the Payment Period column of every included entry."
   - "If there are no matching entries, the system does not create archived tabs or modify timesheets or Current period."
   - "The system creates copies of Current period named period_name in General Expenses and Payment Distribution."
+  - "The system writes period_name to the Period column in the archived tabs of General Expenses and Payment Distribution."
   - "Archived tabs contain fully recalculated hours, rates, amounts, and totals for the included entries, with formulas replaced by their values."
   - "Changes to source hours or rates after closure do not change archived values."
   - "In archived tabs and specialist timesheets, the system creates strict Protected Ranges for all cells except payment status cells defined by the templates; only the document owner can edit protected cells."
@@ -29,3 +30,6 @@ implements:
   - src/feptm/timesheets/project_service.py
   - src/feptm/timesheets/config_service.py
   - src/feptm/services/google_sheets_service.py
+
+revision_history:
+  - "v1 (2026-08-11, commit TBD): when closing a payment period, the system records period_name in the Period column of the archived General Expenses and Payment Distribution tabs."
