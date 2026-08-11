@@ -262,14 +262,15 @@ class ProjectStorage:
         sheet_data = self._read_current_period(spreadsheet_id, sheet_name)
         if not sheet_data:
             return
-        values, headers, _ = sheet_data
+        values, headers, sheet = sheet_data
         target_row = _find_specialist_row(
             values, headers, specialist.name, self._sheets
         )
         if target_row is None:
             return
+        sheet_id = sheet.get("properties", {}).get("sheetId")
         _write_specialist_fields(
-            self._sheets, spreadsheet_id, sheet_name, target_row, specialist, headers
+            self._sheets, spreadsheet_id, sheet_id, target_row, specialist, headers
         )
 
     def _create_from_template(
@@ -369,7 +370,7 @@ class ProjectStorage:
                 _add_formulas_for_row(
                     self._sheets,
                     spreadsheet_id,
-                    sheet_name,
+                    sheet_id,
                     target_row,
                     headers,
                     formula_provider,
@@ -378,7 +379,7 @@ class ProjectStorage:
                 log.warning("Failed to add formulas: %s", exc)
 
         _write_specialist_fields(
-            self._sheets, spreadsheet_id, sheet_name, target_row, specialist, headers
+            self._sheets, spreadsheet_id, sheet_id, target_row, specialist, headers
         )
 
     def _copy_row_formatting(
@@ -1068,7 +1069,7 @@ def _column_letter(index: int) -> str:
 def _add_formulas_for_row(
     sheets: GoogleSheetsService,
     spreadsheet_id: str,
-    sheet_name: str,
+    sheet_id: int,
     target_row: int,
     headers: list[str],
     formula_provider: Any,
@@ -1080,26 +1081,45 @@ def _add_formulas_for_row(
         (ColumnName.CLIENT_WORK_COST_USD.value, FormulaName.GROSS_TOTAL_COST.value),
         (ColumnName.REVENUE_USD.value, FormulaName.REVENUE.value),
     ]
+    requests: list[dict[str, Any]] = []
+    row_index = target_row - 1
     for col_name, formula_name in formula_map:
         col_idx = sheets.find_column_index(headers, [col_name])
         if col_idx is None:
             continue
+        formula = formula_provider.get_formula(formula_name)
+        requests.append(
+            {
+                "updateCells": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": row_index,
+                        "endRowIndex": row_index + 1,
+                        "startColumnIndex": col_idx,
+                        "endColumnIndex": col_idx + 1,
+                    },
+                    "rows": [
+                        {
+                            "values": [
+                                {"userEnteredValue": {"formulaValue": formula}}
+                            ]
+                        }
+                    ],
+                    "fields": "userEnteredValue",
+                }
+            }
+        )
+    if requests:
         try:
-            formula = formula_provider.get_formula(formula_name)
-            sheets.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{sheet_name}!{_column_letter(col_idx)}{target_row}",
-                values=[[formula]],
-                value_input_option="USER_ENTERED",
-            )
+            sheets.batch_update(spreadsheet_id, requests)
         except Exception as exc:
-            log.warning("Failed to set %s formula: %s", col_name, exc)
+            log.warning("Failed to batch-update formulas: %s", exc)
 
 
 def _write_specialist_fields(
     sheets: GoogleSheetsService,
     spreadsheet_id: str,
-    sheet_name: str,
+    sheet_id: int,
     target_row: int,
     specialist: Specialist,
     headers: list[str],
@@ -1111,16 +1131,35 @@ def _write_specialist_fields(
         (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, str(specialist.internal_rate)),
         (ColumnName.CLIENT_HOURLY_RATE_USD.value, str(specialist.external_rate)),
     ]
+    requests: list[dict[str, Any]] = []
+    row_index = target_row - 1
     for col_name, val in field_updates:
         col_idx = sheets.find_column_index(headers, [col_name])
         if col_idx is None:
             continue
+        requests.append(
+            {
+                "updateCells": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": row_index,
+                        "endRowIndex": row_index + 1,
+                        "startColumnIndex": col_idx,
+                        "endColumnIndex": col_idx + 1,
+                    },
+                    "rows": [
+                        {
+                            "values": [
+                                {"userEnteredValue": {"stringValue": str(val)}}
+                            ]
+                        }
+                    ],
+                    "fields": "userEnteredValue",
+                }
+            }
+        )
+    if requests:
         try:
-            sheets.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{sheet_name}!{_column_letter(col_idx)}{target_row}",
-                values=[[val]],
-                value_input_option="USER_ENTERED",
-            )
+            sheets.batch_update(spreadsheet_id, requests)
         except Exception as exc:
-            log.warning("Failed to update %s: %s", col_name, exc)
+            log.warning("Failed to batch-update specialist fields: %s", exc)

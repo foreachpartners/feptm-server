@@ -1,6 +1,8 @@
 """Service for working with Google Sheets API."""
 
 import json
+import random
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +14,19 @@ from googleapiclient.errors import HttpError  # type: ignore
 
 from feptm.core.config import settings
 from feptm.core.log import log
+
+
+class GoogleSheetsRateLimitError(Exception):
+    """Raised when Google Sheets API rate limit is exhausted after all retries."""
+
+    def __init__(self, operation: str, spreadsheet_id: str, attempts: int) -> None:
+        self.operation = operation
+        self.spreadsheet_id = spreadsheet_id
+        self.attempts = attempts
+        super().__init__(
+            f"Rate limit exhausted for {operation} on {spreadsheet_id} "
+            f"after {attempts} retries"
+        )
 
 
 class GoogleSheetsService:
@@ -457,6 +472,62 @@ class GoogleSheetsService:
                 f"Failed to move file with ID {file_id} to folder {folder_id}: {error}"
             )
 
+    def _retry_api_call(
+        self,
+        operation_name: str,
+        spreadsheet_id: str,
+        callable_fn: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        max_retries = 5
+        base_delay = 1.0
+        max_delay = 60.0
+        for attempt in range(max_retries + 1):
+            try:
+                return callable_fn(*args, **kwargs)
+            except HttpError as error:
+                status = error.resp.status
+                if status == 429:
+                    retry_header = error.resp.get("Retry-After")
+                    if retry_header:
+                        retry_after = float(retry_header)
+                    else:
+                        retry_after = base_delay * (2**attempt) + random.uniform(
+                            0, 1
+                        )
+                    delay = min(retry_after, max_delay)
+                    log.warning(
+                        "Rate limited (%s, %s): attempt %d/%d, waiting %.1fs",
+                        operation_name,
+                        spreadsheet_id,
+                        attempt + 1,
+                        max_retries,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                if status >= 500:
+                    delay = min(
+                        base_delay * (2**attempt) + random.uniform(0, 1),
+                        max_delay,
+                    )
+                    log.warning(
+                        "Server error %d (%s, %s): attempt %d/%d, waiting %.1fs",
+                        status,
+                        operation_name,
+                        spreadsheet_id,
+                        attempt + 1,
+                        max_retries,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise Exception(f"Failed to {operation_name}: {error}")
+        raise GoogleSheetsRateLimitError(
+            operation_name, spreadsheet_id, max_retries
+        )
+
     def clear_range(self, spreadsheet_id: str, range_name: str) -> None:
         """Clear values in a range.
 
@@ -471,9 +542,16 @@ class GoogleSheetsService:
             raise Exception("Sheets service not initialized")
 
         try:
-            self.sheets_service.spreadsheets().values().clear(
-                spreadsheetId=spreadsheet_id, range=range_name, body={}
-            ).execute()
+            self._retry_api_call(
+                "clear_range",
+                spreadsheet_id,
+                lambda: self.sheets_service.spreadsheets()
+                .values()
+                .clear(spreadsheetId=spreadsheet_id, range=range_name, body={})
+                .execute(),
+            )
+        except GoogleSheetsRateLimitError:
+            raise
         except Exception as error:
             log.warning(f"Warning: Failed to clear range {range_name}: {error}")
             # We don't raise an exception here since clearing might be optional
@@ -500,8 +578,10 @@ class GoogleSheetsService:
             raise Exception("Sheets service not initialized")
 
         try:
-            result = (
-                self.sheets_service.spreadsheets()
+            result = self._retry_api_call(
+                "update_range",
+                spreadsheet_id,
+                lambda: self.sheets_service.spreadsheets()
                 .values()
                 .update(
                     spreadsheetId=spreadsheet_id,
@@ -509,7 +589,7 @@ class GoogleSheetsService:
                     valueInputOption=value_input_option,
                     body={"values": values},
                 )
-                .execute()
+                .execute(),
             )
             return cast(dict[str, Any], result)
         except HttpError as error:
@@ -575,13 +655,17 @@ class GoogleSheetsService:
             raise Exception("Sheets service not initialized")
 
         try:
-            result = (
-                self.sheets_service.spreadsheets()
-                .batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests})
-                .execute()
+            result = self._retry_api_call(
+                "batch_update",
+                spreadsheet_id,
+                lambda: self.sheets_service.spreadsheets()
+                .batchUpdate(
+                    spreadsheetId=spreadsheet_id, body={"requests": requests}
+                )
+                .execute(),
             )
             return cast(dict[str, Any], result)
-        except HttpError as error:
+        except Exception as error:
             raise Exception(f"Failed to batch update spreadsheet: {error}")
 
     # Utility methods for Google Sheets operations

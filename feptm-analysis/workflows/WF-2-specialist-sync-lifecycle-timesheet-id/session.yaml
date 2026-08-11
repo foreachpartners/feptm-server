@@ -8,7 +8,7 @@ repos:
 - feptm-server
 - feptm-analysis
 ceremony: medium
-status: done
+status: planned
 baseline_policy: ignore
 sessions:
   init: SID-1786371039-d80cfc4c
@@ -28,3 +28,5 @@ sessions:
   finalize_4: SID-1786462589-481f1f2b
   plan_6: SID-1786464173-7bf72c04
   finalize_5: SID-1786467478-0dd9ac09
+  plan_7: SID-1786472682-b7fbb6bf
+  implement_6: SID-1786472796-ed6373df

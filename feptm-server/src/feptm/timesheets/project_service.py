@@ -1,5 +1,6 @@
 """Service for handling project timesheets and related operations."""
 
+import time
 from datetime import UTC, datetime
 
 from feptm.core.log import log
@@ -150,6 +151,7 @@ class TimesheetProjectService:
                 self._projects.update_current_period(
                     project.calculations_spreadsheet_id, sp, self._formulas
                 )
+            time.sleep(0.25)  # AR-ARCH-005:allow
 
         log.info(
             "Synchronized %d specialists, created %d new timesheets",

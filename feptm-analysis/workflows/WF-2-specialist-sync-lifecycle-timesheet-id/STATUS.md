@@ -22,3 +22,4 @@ Fix specialist re-add cycle (BUG-03): Drive dedup in `create_timesheet()` preven
 | 8 | archive/plan-006.md | archive/tasks-006.md | 2026-08-11 | finalized |
 | 9 | plan.md | tasks.md | 2026-08-11 | 3/3 done (numeric date serials), 0 ERR, 0 WARN |
 | 10 | archive/plan-008.md | archive/tasks-008.md | 2026-08-11 | finalized |
+| 11 | api-resilience | plan.md (v7) | 2026-08-11 | 6/6 done, 0 ERR, 0 WARN |

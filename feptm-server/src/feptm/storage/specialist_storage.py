@@ -204,6 +204,12 @@ class SpecialistStorage:
     def _apply_updates(
         self, spreadsheet_id: str, sheet_name: str, updates: list[tuple[int, str]]
     ) -> None:
+        sheet = self._sheets.get_sheet_by_name(spreadsheet_id, sheet_name)
+        if not sheet:
+            raise Exception(f"Sheet '{sheet_name}' not found")
+
+        sheet_id = sheet.get("properties", {}).get("sheetId")
+
         _, headers = self._sheets.get_sheet_data_with_headers(
             spreadsheet_id, sheet_name, RangeFormat.SPECIALIST_DATA.value
         )
@@ -213,17 +219,33 @@ class SpecialistStorage:
         if timesheet_col is None:
             raise Exception("Timesheet column not found")
 
-        col_letter = self._sheets.column_index_to_letter(timesheet_col)
+        requests: list[dict[str, Any]] = []
         for row_idx, ts_id in updates:
             if "spreadsheets/d/" not in ts_id:
                 ts_id = f"https://docs.google.com/spreadsheets/d/{ts_id}"
-            url = ts_id
-            self._sheets.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{sheet_name}!{col_letter}{row_idx}",
-                values=[[url]],
-                value_input_option="RAW",
+            requests.append(
+                {
+                    "updateCells": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": row_idx - 1,
+                            "endRowIndex": row_idx,
+                            "startColumnIndex": timesheet_col,
+                            "endColumnIndex": timesheet_col + 1,
+                        },
+                        "rows": [
+                            {
+                                "values": [
+                                    {"userEnteredValue": {"stringValue": ts_id}}
+                                ]
+                            }
+                        ],
+                        "fields": "userEnteredValue",
+                    }
+                }
             )
+        if requests:
+            self._sheets.batch_update(spreadsheet_id, requests)
 
 
 def _opt(row: list, idx: int | None) -> str | None:

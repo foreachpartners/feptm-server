@@ -1,0 +1,65 @@
+id: "AR-ARCH-005"
+title: "Google Sheets API Resilience"
+scope: [service]
+always_apply: false
+context: ""
+
+requirements:
+  - "All Google Sheets API write calls (batch_update, update_range, clear_range) in google_sheets_service.py MUST be wrapped with retry logic that handles HTTP 429 (Rate Limit) and 5xx (Server Error) responses."
+  - "Retry strategy MUST use exponential backoff with jitter: initial delay 1s, max delay 60s, maximum 5 retries."
+  - "Retry logic MUST honor the Retry-After response header when present on 429 responses, using it as a minimum wait before the next attempt."
+  - "The retry wrapper MUST be implemented as a shared decorator or utility in the GoogleSheetsService class, not duplicated per-method."
+  - "Google Sheets API calls that exhaust all retries MUST log the failure at ERROR level with the spreadsheet ID, operation name, and error details, then raise a domain-specific exception (GoogleSheetsRateLimitError or GoogleSheetsServerError)."
+  - "Long-running batch operations spanning multiple API calls (e.g., sync loops over specialists) MUST include a throttling mechanism to avoid exceeding the per-minute write quota (default: 60 requests per minute per user)."
+  - "The throttling mechanism MUST be a shared rate-limiter utility (token bucket or sliding window) reusable across all storage operations, not ad-hoc sleep calls in business logic."
+
+prohibitions:
+  - "Calling googleapiclient .execute() on batchUpdate, values().update, or values().clear without prior retry wrapper."
+  - "Catching bare Exception around Google Sheets API calls and silently swallowing rate-limit or server errors."
+  - "Hardcoding time.sleep() or asyncio.sleep() inline in storage or business logic to work around rate limits — use the shared rate-limiter utility."
+  - "Infinite retry loops with no maximum retry count or timeout ceiling."
+  - "Duplicating retry or backoff logic across storage modules — the resilience layer lives in GoogleSheetsService only."
+
+checks:
+  retry-wrapper-present:
+    type: file_exists
+    severity: error
+    aspect: architecture
+    description: "Retry wrapper must be implemented in GoogleSheetsService"
+    required:
+      - "src/feptm/services/google_sheets_service.py"
+
+  no-inline-time-sleep:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "No hardcoded sleep calls in storage or timesheets modules"
+    files: "src/feptm/{storage,timesheets}/**/*.py"
+    exclude_lines:
+      - 'AR-ARCH-005:allow'
+      - '^\s*#'
+    negative:
+      - pattern: 'time\.sleep\('
+        message: "Inline time.sleep() in storage/timesheets — use the GoogleSheetsService rate-limiter"
+      - pattern: 'asyncio\.sleep\('
+        message: "Inline asyncio.sleep() in storage/timesheets — use the GoogleSheetsService rate-limiter"
+
+  no-bare-google-api-execute:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "All write calls through google_sheets_service must use retry wrapper"
+    files: "src/feptm/services/google_sheets_service.py"
+    exclude_lines:
+      - 'AR-ARCH-005:allow'
+      - '^\s*#'
+      - '^\s*def '
+      - '^\s*(import|from) '
+      - '^\s*[\"]# '
+      - '^\s*if '
+      - '^\s*return '
+    positive:
+      - pattern: '_retry_api_call\(|_with_retry\(|@retry'
+        message: "Google Sheets write method without retry wrapper — wrap .execute() with retry logic"
+
+enforcement: []
