@@ -1,0 +1,16 @@
+created: '2026-08-12'
+description: 'Fix close_period to handle deleted specialists: update timesheet entries
+  and include them in archives'
+fr_ids:
+- FR-SPECIALIST-001
+- FR-PAYMENT-001
+repos:
+- feptm-server
+ceremony: medium
+sessions:
+  init: SID-1786532000-91f3ae90
+  plan: SID-1786532012-01451a93
+  implement: SID-1786532415-7101f4b3
+  finalize: SID-1786532531-b0774c4d
+  finalize2: SID-1786533880-b5846b10
+status: done

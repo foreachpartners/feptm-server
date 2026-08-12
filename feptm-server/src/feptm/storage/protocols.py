@@ -84,6 +84,14 @@ class ProjectStorageProtocol(Protocol):
         """Add protected ranges to an archived tab, leaving Payment Status editable."""
         ...
 
+    def get_stale_specialists(
+        self,
+        spreadsheet_id: str,
+        active_names: set[str],
+    ) -> list[Specialist]:
+        """Find specialists in Current Period not in active_names, with rates and timesheet IDs."""
+        ...
+
     def remove_stale_specialists(
         self,
         spreadsheet_id: str,

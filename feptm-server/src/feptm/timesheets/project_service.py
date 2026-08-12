@@ -272,12 +272,30 @@ class TimesheetProjectService:
             specialists_processed += 1
             total_entries += updated
 
+        active_names = {sp.name for sp in specialists}
+        stale_specialists: list[Specialist] = []
+        if project.calculations_spreadsheet_id:
+            stale_specialists = self._projects.get_stale_specialists(
+                project.calculations_spreadsheet_id, active_names
+            )
+            for sp in stale_specialists:
+                if not sp.timesheet:
+                    continue
+                ts_id = utils.extract_id_from_hyperlink_formula(sp.timesheet) or sp.timesheet
+                updated = self._projects.close_period_in_timesheet(
+                    ts_id, period_name, start_date, end_date
+                )
+                specialists_processed += 1
+                total_entries += updated
+
+        all_specialists = specialists + stale_specialists
+
         if total_entries > 0:
             if project.report_spreadsheet_id:
                 report_archived = self._projects.archive_current_period(
                     project.report_spreadsheet_id,
                     period_name,
-                    specialists,
+                    all_specialists,
                     start_date,
                     end_date,
                 )
@@ -291,7 +309,7 @@ class TimesheetProjectService:
                 calculations_archived = self._projects.archive_current_period(
                     project.calculations_spreadsheet_id,
                     period_name,
-                    specialists,
+                    all_specialists,
                     start_date,
                     end_date,
                 )
@@ -301,8 +319,6 @@ class TimesheetProjectService:
                         period_name,
                         payment_status_col_idx=5,
                     )
-
-        active_names = {sp.name for sp in specialists}
         if project.report_spreadsheet_id:
             removed = self._projects.remove_stale_specialists(
                 project.report_spreadsheet_id, active_names

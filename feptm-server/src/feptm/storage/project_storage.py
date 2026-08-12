@@ -1,6 +1,7 @@
 """Storage for project-scoped spreadsheet operations."""
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 
 from feptm.core import utils
@@ -313,7 +314,11 @@ class ProjectStorage:
         result = (
             self._sheets.sheets_service.spreadsheets()
             .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_name)
+            .get(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueRenderOption="UNFORMATTED_VALUE",
+            )
             .execute()
         )
         values: list[list] = result.get("values", [])
@@ -710,6 +715,44 @@ class ProjectStorage:
             removed, spreadsheet_id,
         )
         return removed
+
+    def get_stale_specialists(
+        self,
+        spreadsheet_id: str,
+        active_names: set[str],
+    ) -> list[Specialist]:
+        cp_data = self._read_current_period(
+            spreadsheet_id, SheetName.CURRENT_PERIOD.value
+        )
+        if not cp_data:
+            return []
+        values, headers, _ = cp_data
+
+        stale: list[Specialist] = []
+        for row in values[1:]:
+            _pad_row(row, len(headers))
+            name = str(row[0]).strip() if row else ""
+            if not name or name in active_names or _is_total_row(row, headers, 0, self._sheets):
+                continue
+
+            cl_rate = _parse_rate_from_row(row, headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
+            sp_rate = _parse_rate_from_row(row, headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
+
+            role_idx = _find_column_contains(headers, ColumnName.SPECIALIST_ROLE.value)
+            role = str(row[role_idx]) if role_idx is not None and role_idx < len(row) else ""
+
+            timesheet_url = self._extract_timesheet_id_from_tab(spreadsheet_id, name)
+            timesheet_id = utils.extract_id_from_hyperlink_formula(timesheet_url or "") or timesheet_url
+
+            stale.append(Specialist(
+                name=name,
+                role=role,
+                external_rate=Decimal(str(cl_rate)) if cl_rate is not None else Decimal(0),
+                internal_rate=Decimal(str(sp_rate)) if sp_rate is not None else Decimal(0),
+                timesheet=timesheet_id,
+            ))
+
+        return stale
 
     def _extract_timesheet_id_from_tab(
         self,
