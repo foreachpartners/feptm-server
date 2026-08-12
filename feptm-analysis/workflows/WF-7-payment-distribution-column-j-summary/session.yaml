@@ -1,0 +1,16 @@
+created: '2026-08-12'
+description: 'Fix Payment Distribution column J summary formula: inject real project
+  name, compute values in archive'
+fr_ids:
+- FR-SPECIALIST-001
+- FR-PAYMENT-001
+repos:
+- feptm-server
+ceremony: medium
+status: context_ready
+sessions:
+  init: SID-1786534382-8d4d60a6
+  plan: SID-1786534393-d0dcd42c
+  implement: SID-1786534783-73327841
+  finalize: SID-1786534871-af32b097
+status: done

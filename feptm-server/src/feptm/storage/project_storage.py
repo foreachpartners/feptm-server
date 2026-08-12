@@ -463,7 +463,9 @@ class ProjectStorage:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
 
-        timesheet_id = utils.extract_id_from_hyperlink_formula(timesheet_id) or timesheet_id
+        timesheet_id = (
+            utils.extract_id_from_hyperlink_formula(timesheet_id) or timesheet_id
+        )
 
         spreadsheet = (
             self._sheets.sheets_service.spreadsheets()
@@ -498,14 +500,14 @@ class ProjectStorage:
             headers, [ColumnName.PAYMENT_PERIOD.value]
         )
         if period_col is None:
-            period_col = _find_column_contains(
-                headers, ColumnName.PAYMENT_PERIOD.value
-            )
+            period_col = _find_column_contains(headers, ColumnName.PAYMENT_PERIOD.value)
         if date_col is None or period_col is None:
             log.warning(
                 "Timesheet %s: missing columns. headers=%s, Date found=%s, Payment Period found=%s",
-                timesheet_id, headers,
-                date_col is not None, period_col is not None,
+                timesheet_id,
+                headers,
+                date_col is not None,
+                period_col is not None,
             )
             return 0
 
@@ -519,10 +521,12 @@ class ProjectStorage:
             if parsed is None:
                 log.error(
                     "Invalid date format in timesheet %s row %d: %s (expected DD.MM.YYYY)",
-                    timesheet_id, i + 1, date_val,
+                    timesheet_id,
+                    i + 1,
+                    date_val,
                 )
                 raise Exception(
-                    f"Invalid date format in timesheet {timesheet_id} row {i+1}: {date_val!r} (expected DD.MM.YYYY)"
+                    f"Invalid date format in timesheet {timesheet_id} row {i + 1}: {date_val!r} (expected DD.MM.YYYY)"
                 )
             if parsed < start_date or parsed > end_date:
                 continue
@@ -539,7 +543,9 @@ class ProjectStorage:
                 )
                 updates += 1
             except Exception as exc:
-                log.warning("Failed to update Payment Period for row %d: %s", i + 1, exc)
+                log.warning(
+                    "Failed to update Payment Period for row %d: %s", i + 1, exc
+                )
 
         log.info(
             "Updated %d entries in timesheet %s for period %s",
@@ -572,11 +578,7 @@ class ProjectStorage:
             return False
         values, headers, _ = cp_data
 
-        sp_map = {
-            sp.name: sp
-            for sp in specialists
-            if sp.timesheet
-        }
+        sp_map = {sp.name: sp for sp in specialists if sp.timesheet}
 
         archive = [list(headers)]
 
@@ -600,7 +602,9 @@ class ProjectStorage:
             if not timesheet_id:
                 continue
 
-            hours = self._sum_period_hours(timesheet_id, start_date, end_date, period_name)
+            hours = self._sum_period_hours(
+                timesheet_id, start_date, end_date, period_name
+            )
             if hours <= 0:
                 continue
 
@@ -626,6 +630,19 @@ class ProjectStorage:
                     new_row[col_idx] = val
             _pad_row(new_row, period_idx + 1)
             new_row[period_idx] = period_name
+
+            if (
+                _find_column_contains(headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
+                is not None
+            ):
+                col_j = 9
+                _pad_row(new_row, col_j + 1)
+                new_row[col_j] = (
+                    f"{sp_name} | Project: {sp.project or ''}"
+                    f" | Period: {period_name} | Hours: {hours}"
+                    f" | Rate (USD): {sp_rate} | Total (USD): {sp_cost}"
+                )
+
             archive.append(new_row)
             archive_data.append((hours, cl_cost, sp_cost, revenue))
 
@@ -654,9 +671,7 @@ class ProjectStorage:
             spreadsheet_id=spreadsheet_id,
             requests=[{"addSheet": {"properties": {"title": period_name}}}],
         )
-        new_range = RangeFormat.CURRENT_PERIOD.value.format(
-            sheet_name=period_name
-        )
+        new_range = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=period_name)
         self._sheets.update_range(
             spreadsheet_id=spreadsheet_id,
             range_name=new_range,
@@ -698,21 +713,24 @@ class ProjectStorage:
 
         requests: list[dict] = []
         for row_idx in sorted(rows_to_delete, reverse=True):
-            requests.append({
-                "deleteDimension": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "dimension": "ROWS",
-                        "startIndex": row_idx,
-                        "endIndex": row_idx + 1,
+            requests.append(
+                {
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": row_idx,
+                            "endIndex": row_idx + 1,
+                        }
                     }
                 }
-            })
+            )
         self._sheets.batch_update(spreadsheet_id, requests)
         removed = len(rows_to_delete)
         log.info(
             "Removed %d stale specialist rows from Current Period in %s",
-            removed, spreadsheet_id,
+            removed,
+            spreadsheet_id,
         )
         return removed
 
@@ -732,25 +750,46 @@ class ProjectStorage:
         for row in values[1:]:
             _pad_row(row, len(headers))
             name = str(row[0]).strip() if row else ""
-            if not name or name in active_names or _is_total_row(row, headers, 0, self._sheets):
+            if (
+                not name
+                or name in active_names
+                or _is_total_row(row, headers, 0, self._sheets)
+            ):
                 continue
 
-            cl_rate = _parse_rate_from_row(row, headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
-            sp_rate = _parse_rate_from_row(row, headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
+            cl_rate = _parse_rate_from_row(
+                row, headers, ColumnName.CLIENT_HOURLY_RATE_USD.value
+            )
+            sp_rate = _parse_rate_from_row(
+                row, headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value
+            )
 
             role_idx = _find_column_contains(headers, ColumnName.SPECIALIST_ROLE.value)
-            role = str(row[role_idx]) if role_idx is not None and role_idx < len(row) else ""
+            role = (
+                str(row[role_idx])
+                if role_idx is not None and role_idx < len(row)
+                else ""
+            )
 
             timesheet_url = self._extract_timesheet_id_from_tab(spreadsheet_id, name)
-            timesheet_id = utils.extract_id_from_hyperlink_formula(timesheet_url or "") or timesheet_url
+            timesheet_id = (
+                utils.extract_id_from_hyperlink_formula(timesheet_url or "")
+                or timesheet_url
+            )
 
-            stale.append(Specialist(
-                name=name,
-                role=role,
-                external_rate=Decimal(str(cl_rate)) if cl_rate is not None else Decimal(0),
-                internal_rate=Decimal(str(sp_rate)) if sp_rate is not None else Decimal(0),
-                timesheet=timesheet_id,
-            ))
+            stale.append(
+                Specialist(
+                    name=name,
+                    role=role,
+                    external_rate=Decimal(str(cl_rate))
+                    if cl_rate is not None
+                    else Decimal(0),
+                    internal_rate=Decimal(str(sp_rate))
+                    if sp_rate is not None
+                    else Decimal(0),
+                    timesheet=timesheet_id,
+                )
+            )
 
         return stale
 
@@ -777,6 +816,7 @@ class ProjectStorage:
                 return None
             formula = str(vals[0][0])
             import re
+
             m = re.search(r'IMPORTRANGE\s*\(\s*"([^"]+)"', formula)
             return m.group(1) if m else None
         except Exception as exc:
@@ -804,9 +844,7 @@ class ProjectStorage:
         if not sheet_name:
             return 0.0
 
-        range_name = RangeFormat.TIMESHEET_DATA.value.format(
-            sheet_name=sheet_name
-        )
+        range_name = RangeFormat.TIMESHEET_DATA.value.format(sheet_name=sheet_name)
         result = (
             self._sheets.sheets_service.spreadsheets()
             .values()
@@ -823,7 +861,9 @@ class ProjectStorage:
 
         headers = values[0]
         date_col = self._sheets.find_column_index(headers, [ColumnName.DATE.value])
-        hours_col = self._sheets.find_column_index(headers, [ColumnName.WORK_HOURS.value])
+        hours_col = self._sheets.find_column_index(
+            headers, [ColumnName.WORK_HOURS.value]
+        )
 
         max_col = max(date_col or 0, hours_col or 0)
         if date_col is None or hours_col is None:
@@ -846,10 +886,12 @@ class ProjectStorage:
             if parsed is None:
                 log.error(
                     "Invalid date format in timesheet %s row %d: %s (expected DD.MM.YYYY)",
-                    timesheet_id, i + 1, row[date_col],
+                    timesheet_id,
+                    i + 1,
+                    row[date_col],
                 )
                 raise Exception(
-                    f"Invalid date format in timesheet {timesheet_id} row {i+1}: {row[date_col]!r} (expected DD.MM.YYYY)"
+                    f"Invalid date format in timesheet {timesheet_id} row {i + 1}: {row[date_col]!r} (expected DD.MM.YYYY)"
                 )
             if parsed < start_date or parsed > end_date:
                 continue
@@ -936,9 +978,7 @@ def _pad_row(row: list, size: int) -> None:
         row.append("")
 
 
-def _parse_rate_from_row(
-    row: list, headers: list[str], col_name: str
-) -> float | None:
+def _parse_rate_from_row(row: list, headers: list[str], col_name: str) -> float | None:
     col_idx = _find_column_contains(headers, col_name)
     if col_idx is None or col_idx >= len(row):
         return None
@@ -1103,11 +1143,7 @@ def _add_formulas_for_row(
                         "endColumnIndex": col_idx + 1,
                     },
                     "rows": [
-                        {
-                            "values": [
-                                {"userEnteredValue": {"formulaValue": formula}}
-                            ]
-                        }
+                        {"values": [{"userEnteredValue": {"formulaValue": formula}}]}
                     ],
                     "fields": "userEnteredValue",
                 }
@@ -1156,11 +1192,7 @@ def _write_specialist_fields(
                         "startColumnIndex": col_idx,
                         "endColumnIndex": col_idx + 1,
                     },
-                    "rows": [
-                        {
-                            "values": [cell]
-                        }
-                    ],
+                    "rows": [{"values": [cell]}],
                     "fields": "userEnteredValue",
                 }
             }
@@ -1170,3 +1202,47 @@ def _write_specialist_fields(
             sheets.batch_update(spreadsheet_id, requests)
         except Exception as exc:
             log.warning("Failed to batch-update specialist fields: %s", exc)
+
+    if specialist.project:
+        pd_idx = sheets.find_column_index(
+            headers, [ColumnName.CLIENT_HOURLY_RATE_USD.value]
+        )
+        if pd_idx is not None:
+            formula = (
+                f"=CONCATENATE($A{target_row};"
+                f'" | Project: {specialist.project} | Period: ";'
+                f'$C{target_row}; " | Hours: "; $D{target_row};'
+                f'" | Rate (USD): "; $G{target_row};'
+                f'" | Total (USD): "; $H{target_row})'
+            )
+            try:
+                sheets.batch_update(
+                    spreadsheet_id,
+                    [
+                        {
+                            "updateCells": {
+                                "range": {
+                                    "sheetId": sheet_id,
+                                    "startRowIndex": row_index,
+                                    "endRowIndex": row_index + 1,
+                                    "startColumnIndex": 9,
+                                    "endColumnIndex": 10,
+                                },
+                                "rows": [
+                                    {
+                                        "values": [
+                                            {
+                                                "userEnteredValue": {
+                                                    "formulaValue": formula
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "fields": "userEnteredValue",
+                            }
+                        }
+                    ],
+                )
+            except Exception as exc:
+                log.warning("Failed to write column J formula: %s", exc)

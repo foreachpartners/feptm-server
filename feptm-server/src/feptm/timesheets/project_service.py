@@ -114,6 +114,9 @@ class TimesheetProjectService:
 
         specialists, _ = self._specialists.list_from_sheet(project_id)
 
+        for sp in specialists:
+            sp.project = project.name
+
         if not specialists:
             return [], 0, 0
 
@@ -180,6 +183,10 @@ class TimesheetProjectService:
         )
 
         specialists, _ = self._specialists.list_from_sheet(project_id)
+
+        for sp in specialists:
+            sp.project = project.name
+
         if not specialists:
             return [], 0
 
@@ -279,6 +286,7 @@ class TimesheetProjectService:
                 project.calculations_spreadsheet_id, active_names
             )
             for sp in stale_specialists:
+                sp.project = project.name
                 if not sp.timesheet:
                     continue
                 ts_id = utils.extract_id_from_hyperlink_formula(sp.timesheet) or sp.timesheet
