@@ -15,7 +15,7 @@ acceptance_criteria:
   - "Re-running sync does not create duplicate timesheets for specialists who already have a timesheet ID in the Team sheet."
   - "Running rate sync for a project where no prior sync was performed auto-creates timesheets for specialists without them, writes IDs back, then propagates rates to Current Period sheets."
   - "Sync correctly processes specialists with empty, invalid, or locale-specific date formats without stopping the pipeline for valid rows."
-  - "Sync correctly processes specialists with empty, invalid, or locale-specific rate values by using a default rate of 0 without stopping the pipeline."
+  - "Sync correctly processes supported locale-specific numeric rate formats. If a new rate is empty or invalid, sync preserves the previous rates and calculations, writes an ERROR log, then continues processing other valid rows."
   - "The sync pipeline does not skip the ID write-back step when the number of newly created timesheets differs from the pre-existing count."
   - "Running sync with no specialist changes produces zero net modifications to the Team sheet, report spreadsheets, or calculation spreadsheets."
 
@@ -30,3 +30,4 @@ implements:
 revision_history:
   - "v1 (2026-08-08, commit TBD): initial spec — captured uncovered sync lifecycle gap. Timesheet IDs were not written back to Team sheet when all specialists were new (update_timesheet_ids gated on existing_count instead of newly created count). Rate sync had no auto-timesheet creation path."
   - "v2 (2026-08-08, WF-1 fix): fix update_timesheet_ids guard — compute new_count from specialists without timesheets instead of reusing existing_count from list_from_sheet. Add auto-timesheet creation to sync_project_rates so rate sync is self-sufficient when run before initial sync."
+  - "v3 (2026-08-14, commit TBD): empty or invalid new rate values no longer default to 0; sync preserves the previous rates and calculations, writes an ERROR log, and continues processing other valid rows."
