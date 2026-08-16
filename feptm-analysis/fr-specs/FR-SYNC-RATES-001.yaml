@@ -1,20 +1,23 @@
 id: FR-SYNC-RATES-001
 title: Update specialist rates during sync
 description: |
-  The user updates the existing Internal Rate and External Rate of an active
-  specialist in the Team sheet and runs sync.
+  The user changes the specialist rate or client rate of an active specialist
+  in Team and runs sync.
 
-  The system replaces the specialist's rates in the current financial reports
-  and recalculates the entire open period using the latest rate values.
-  Financial data for closed archived periods remains unchanged.
+  The system updates the rates in current financial reports and recalculates,
+  using the new rates, every work entry with an empty Payment Period for the
+  specialist whose rate changed. Financial data in closed archived periods
+  remains unchanged.
+
 priority: must
 
 acceptance_criteria:
-  - "If an active specialist's Internal Rate or External Rate changes, sync applies the new value to the current financial reports."
-  - "After a rate change, the entire open period is recalculated using the latest rate value."
-  - "Rate changes do not affect financial data for closed archived periods."
-  - "After a successful sync, all current project financial reports display the updated calculations."
-  - "An invalid rate preserves the previous rates and calculations; sync identifies the specialist and the error reason, then continues processing other valid rows."
+  - "If the specialist rate or client rate of an active specialist changes, sync applies the new value to the current financial reports."
+  - "After a rate change, the system recalculates every work entry with an empty Payment Period for the specialist whose rate changed using the new rate."
+  - "The value and format of Date do not affect work entry selection for rate recalculation."
+  - "Work entries with a non-empty Payment Period and financial data in archived periods are not recalculated after a rate change."
+  - "After sync completes, all current project financial reports display the updated calculations."
+  - "For an invalid rate, sync preserves the previous rates and calculations, writes an ERROR log in the format \"Invalid rate for specialist '{specialist_name}': {rate_type}='{value}' is not a valid number. Previous rate retained.\", and then continues processing other valid rows."
   - "Running sync again without changing rates does not modify the calculation results."
 
 implements:
@@ -27,7 +30,8 @@ implements:
   - src/feptm/storage/project_storage.py::sync_rates_to_current_period
 
 revision_history:
-  - "v1 (2026-08-08, commit TBD): initial FR spec — specialist rates defined in Specialist model, read from Team sheet and written to Current Period sheets during /api/projects/sync."
-  - "v2 (2026-08-08, WF-1): added POST /api/projects/sync-rates endpoint — re-reads rates from Team sheet and propagates to report/calculation spreadsheets independently of full sync."
-  - "v3 (2026-08-08, WF-1 fix): update_current_period was append-only — existing specialists skipped when re-syncing rates. Added sync_rates_to_current_period method that finds existing row and overwrites rate columns via _write_specialist_fields, preserving column formulas."
-  - "v4 (2026-08-08, WF-1): rate sync depends on timesheet IDs in Team sheet — created FR-SYNC-001 to own the full sync lifecycle (timesheet creation, ID write-back, auto-creation before rate sync)."
+  - "v1 (2026-08-08, commit TBD): specialist rates are defined in the Specialist model, read from Team, and written to Current Period during /api/projects/sync."
+  - "v2 (2026-08-08, WF-1): added the POST /api/projects/sync-rates endpoint to re-read rates from Team and update them independently in financial reports."
+  - "v3 (2026-08-08, WF-1 fix): sync_rates_to_current_period updates rates for existing specialists in Current Period while preserving formulas."
+  - "v4 (2026-08-08, WF-1): rate sync requires timesheet IDs in Team; the complete sync lifecycle is defined in FR-SYNC-001."
+  - "v5 (2026-08-14, commit TBD): recalculation includes every work entry with an empty Payment Period for the specialist whose rate changed and does not use Date for entry selection; for an invalid rate, sync preserves the previous rates and calculations, writes an ERROR log containing the specialist name, rate type, and invalid value, and then continues processing other valid rows."

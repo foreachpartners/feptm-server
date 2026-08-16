@@ -1,25 +1,25 @@
 id: FR-SPECIALIST-001
 title: Remove a specialist from future periods through Team
 description: |
-  The user removes a specialist by deleting the specialist's row from the Team
-  sheet.
+  The user removes a specialist by deleting the specialist's row from Team.
 
-  Deleting the Team row does not affect the open payment period. The
-  specialist's work remains included in the Current period in which the row was
-  deleted. After that period is closed, the specialist is excluded from the
-  next and subsequent Current periods.
+  Deleting the Team row does not affect the open period. The specialist's work
+  remains included in Current Period until the period is closed. After closure,
+  the specialist is excluded from the next and subsequent Current Periods.
+
 priority: must
 
 acceptance_criteria:
   - "The user removes a specialist by deleting the specialist's row from Team."
-  - "Deleting the Team row does not remove or modify the specialist's row in the open Current period."
-  - "All eligible work of the removed specialist is included when the open period is closed."
+  - "Deleting the Team row does not remove or modify the specialist's row in the open Current Period."
+  - "When closing a period, the system includes every work entry with an empty Payment Period from the removed specialist's timesheet."
   - "The removed specialist remains included in archived reports for periods in which the specialist participated."
-  - "After the open period is closed successfully, the next Current period is formed from the current Team."
-  - "A specialist absent from Team is not included in the next or subsequent Current periods."
+  - "After period closure, the next Current Period is formed from the current Team."
+  - "A specialist absent from Team is not included in the next or subsequent Current Periods."
+  - "After period closure, a specialist absent from Team is excluded from future periods even if work entries with an empty Payment Period are later added to the specialist's timesheet; this rule takes precedence over the general rule for including entries with an empty Payment Period."
   - "Work of the removed specialist is excluded from calculations starting from the next period."
   - "Deleting the Team row does not delete the specialist's personal timesheet, personal report tabs, or archived data."
-  - "Repeated sync or period closure does not restore the removed specialist in future Current periods."
+  - "Repeated sync or period closure does not restore the removed specialist in future Current Periods."
 
 implements:
   - src/feptm/api/v1/projects.py::sync_project_specialists
@@ -27,3 +27,6 @@ implements:
   - src/feptm/timesheets/specialist_service.py
   - src/feptm/timesheets/project_service.py
   - src/feptm/services/google_sheets_service.py
+
+revision_history:
+  - "v1 (2026-08-14, commit TBD): after period closure, a specialist absent from Team is excluded from future periods regardless of new entries with an empty Payment Period being added to the specialist's timesheet; this rule takes precedence over the general rule for including such entries."
