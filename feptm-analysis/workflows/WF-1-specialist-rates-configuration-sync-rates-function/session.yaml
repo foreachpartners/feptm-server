@@ -8,12 +8,16 @@ sessions:
   finalize: SID-1786214619-fb335b5e
   finalize_fix: SID-1786217932-6220109b
   finalize_2: SID-1786475168-d6ac99f1
+  plan_v3: SID-1786977847-4cc4c85c
+  implement_v3: SID-1786978129-381bc5f9
+  finalize_v3: SID-1786982982-18244923
 description: Update specialist rates configuration for the sync-rates functionality
 fr_ids:
 - FR-SYNC-RATES-001
+- FR-SYNC-001
 repos:
 - feptm-server
 - feptm-analysis
 ceremony: medium
-status: implementing
+status: done
 baseline_policy: ignore
