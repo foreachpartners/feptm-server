@@ -608,6 +608,9 @@ class ProjectStorage:
             if hours <= 0:
                 continue
 
+            if sp.external_rate is None or sp.internal_rate is None:
+                continue
+
             cl_rate = float(sp.external_rate)
             sp_rate = float(sp.internal_rate)
             cl_cost = round(hours * cl_rate, 2)
@@ -1176,6 +1179,8 @@ def _write_specialist_fields(
     for col_name, val in field_updates:
         col_idx = sheets.find_column_index(headers, [col_name])
         if col_idx is None:
+            continue
+        if val is None:
             continue
         if isinstance(val, str):
             entry: dict[str, Any] = {"stringValue": val}

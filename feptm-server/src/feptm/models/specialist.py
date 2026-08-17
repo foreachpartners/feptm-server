@@ -12,8 +12,8 @@ class Specialist(BaseModel):
     name: str
     role: str
     project: str | None = None
-    internal_rate: Decimal = Decimal(0)
-    external_rate: Decimal = Decimal(0)
+    internal_rate: Decimal | None = None
+    external_rate: Decimal | None = None
     date: datetime | None = Field(default_factory=lambda: datetime.now(UTC))
     timesheet: str | None = None
     row_index: int | None = None

@@ -1,6 +1,7 @@
 """Storage for specialist-scoped spreadsheet operations."""
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from feptm.core import utils
@@ -265,12 +266,15 @@ def _serial_from_number(value: int | float) -> datetime | None:
     return None
 
 
-def _parse_decimal(row: list, idx: int | None, name: str, field: str) -> Any:
-    if idx is not None and idx < len(row):
-        rate_str = str(row[idx]).strip()
-        if rate_str:
-            result = utils.parse_decimal_safely(rate_str)
-            if result == 0 and rate_str != "0":
-                log.warning("Invalid %s value for %s: %s", field, name, rate_str)
-            return result
-    return utils.parse_decimal_safely("")
+def _parse_decimal(row: list, idx: int | None, name: str, field: str) -> Decimal | None:
+    if idx is None or idx >= len(row):
+        return None
+    rate_str = str(row[idx]).strip()
+    if not rate_str:
+        return None
+    try:
+        cleaned = rate_str.replace(",", ".")
+        return Decimal(cleaned)
+    except Exception:
+        log.warning("Invalid %s value for %s: '%s'", field, name, rate_str)
+        return None

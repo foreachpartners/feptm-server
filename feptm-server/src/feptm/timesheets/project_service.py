@@ -196,8 +196,38 @@ class TimesheetProjectService:
         if _has_invalid_dates(specialists):
             return [], 0
 
-        created_count = 0
+        valid_specialists: list[Specialist] = []
         for sp in specialists:
+            if sp.internal_rate is None or sp.external_rate is None or sp.internal_rate < 0 or sp.external_rate < 0:
+                if sp.internal_rate is None:
+                    log.error(
+                        "Invalid rate for specialist '%s': internal_rate='<empty>' "
+                        "is not a valid number. Previous rate retained.",
+                        sp.name,
+                    )
+                elif sp.internal_rate < 0:
+                    log.error(
+                        "Invalid rate for specialist '%s': internal_rate='%s' "
+                        "is not a valid rate (must be non-negative). Previous rate retained.",
+                        sp.name, sp.internal_rate,
+                    )
+                if sp.external_rate is None:
+                    log.error(
+                        "Invalid rate for specialist '%s': external_rate='<empty>' "
+                        "is not a valid number. Previous rate retained.",
+                        sp.name,
+                    )
+                elif sp.external_rate < 0:
+                    log.error(
+                        "Invalid rate for specialist '%s': external_rate='%s' "
+                        "is not a valid rate (must be non-negative). Previous rate retained.",
+                        sp.name, sp.external_rate,
+                    )
+                continue
+            valid_specialists.append(sp)
+
+        created_count = 0
+        for sp in valid_specialists:
             if not sp.timesheet:
                 self._specialists.create_timesheet(
                     sp, context, self._timesheet_template_id
@@ -205,9 +235,9 @@ class TimesheetProjectService:
                 created_count += 1
 
         if created_count > 0:
-            self._specialists.update_timesheet_ids(project_id, "Team", specialists)
+            self._specialists.update_timesheet_ids(project_id, "Team", valid_specialists)
 
-        for sp in specialists:
+        for sp in valid_specialists:
             if not sp.timesheet:
                 continue
             import_formula = self._formulas.get_import_timesheet_formula(
@@ -228,7 +258,7 @@ class TimesheetProjectService:
                     project.calculations_spreadsheet_id, sp
                 )
 
-        updated_count = sum(1 for sp in specialists if sp.timesheet)
+        updated_count = sum(1 for sp in valid_specialists if sp.timesheet)
         log.info("Synced rates for %d specialists", updated_count)
         return specialists, updated_count
 

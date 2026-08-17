@@ -432,6 +432,68 @@ class TestSerialToDate:
         assert _serial_to_date(None) is None
 
 
+class TestParseDecimal:
+
+    def test_returns_none_for_empty_string(self):
+        from decimal import Decimal
+
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal([""], 0, "John", "internal_rate")
+        assert result is None
+
+    def test_returns_none_for_whitespace(self):
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["   "], 0, "John", "internal_rate")
+        assert result is None
+
+    def test_returns_none_for_invalid_string(self):
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["abc"], 0, "John", "internal_rate")
+        assert result is None
+
+    def test_returns_zero_for_explicit_zero(self):
+        from decimal import Decimal
+
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["0"], 0, "John", "internal_rate")
+        assert result is not None
+        assert result == Decimal("0")
+
+    def test_returns_decimal_for_valid_number(self):
+        from decimal import Decimal
+
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["100.50"], 0, "John", "internal_rate")
+        assert result is not None
+        assert result == Decimal("100.50")
+
+    def test_returns_decimal_for_comma_format(self):
+        from decimal import Decimal
+
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["100,50"], 0, "John", "internal_rate")
+        assert result is not None
+        assert result == Decimal("100.50")
+
+    def test_returns_none_for_missing_index(self):
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["100"], None, "John", "internal_rate")
+        assert result is None
+
+    def test_returns_none_for_index_out_of_range(self):
+        from feptm.storage.specialist_storage import _parse_decimal
+
+        result = _parse_decimal(["100"], 5, "John", "internal_rate")
+        assert result is None
+
+
 class TestProjectServiceFacade:
 
     def test_create_project(self, project_service, mock_sheets):
@@ -624,6 +686,8 @@ class TestProjectServiceFacade:
         mock_update.assert_not_called()
 
     def test_sync_no_collision_proceeds_normally(self, project_service):
+        from decimal import Decimal
+
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -638,9 +702,11 @@ class TestProjectServiceFacade:
 
         sp1 = Specialist(
             name="John", role="Dev", timesheet="ts-1", row_index=2,
+            internal_rate=Decimal("100"), external_rate=Decimal("120"),
         )
         sp2 = Specialist(
             name="Jane", role="QA", timesheet="ts-2", row_index=3,
+            internal_rate=Decimal("80"), external_rate=Decimal("100"),
         )
         project_service._specialists.list_from_sheet = MagicMock(
             return_value=([sp1, sp2], 2)
@@ -867,3 +933,213 @@ class TestProjectServiceFacade:
         assert result.report_archived is False
         assert result.calculations_archived is False
         project_service._projects.archive_current_period.assert_not_called()
+
+    def test_sync_rates_invalid_rate_logs_error_and_skips(self, project_service):
+        from decimal import Decimal
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp_valid = Specialist(
+            name="John", role="Dev", internal_rate=Decimal("100"),
+            external_rate=Decimal("120"), timesheet="ts-1", row_index=2,
+        )
+        sp_invalid = Specialist(
+            name="Jane", role="QA", internal_rate=None,
+            external_rate=Decimal("80"), timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp_valid, sp_invalid], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 1
+        assert len(specialists) == 2
+        mock_log.error.assert_called_once()
+        error_args = mock_log.error.call_args[0]
+        assert "Invalid rate for specialist '%s'" in error_args[0]
+        assert "Jane" in error_args[1]
+        assert "internal_rate='<empty>'" in error_args[0]
+        assert "is not a valid number" in error_args[0]
+        assert "Previous rate retained" in error_args[0]
+        assert mock_add.call_count == 1
+        assert mock_update.call_count == 1
+
+    def test_sync_rates_both_rates_invalid(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp_invalid = Specialist(
+            name="Jane", role="QA", internal_rate=None,
+            external_rate=None, timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp_invalid], 1)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 0
+        assert len(specialists) == 1
+        assert mock_log.error.call_count == 2
+        mock_add.assert_not_called()
+        mock_update.assert_not_called()
+
+    def test_sync_rates_one_rate_invalid(self, project_service):
+        from decimal import Decimal
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp_invalid = Specialist(
+            name="Jane", role="QA", internal_rate=Decimal("80"),
+            external_rate=None, timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp_invalid], 1)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 0
+        assert len(specialists) == 1
+        mock_log.error.assert_called_once()
+        error_args = mock_log.error.call_args[0]
+        assert "external_rate='<empty>'" in error_args[0]
+        assert "Jane" in error_args[1]
+        mock_add.assert_not_called()
+        mock_update.assert_not_called()
+
+    def test_sync_rates_all_valid_no_error(self, project_service):
+        from decimal import Decimal
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp1 = Specialist(
+            name="John", role="Dev", internal_rate=Decimal("100"),
+            external_rate=Decimal("120"), timesheet="ts-1", row_index=2,
+        )
+        sp2 = Specialist(
+            name="Jane", role="QA", internal_rate=Decimal("80"),
+            external_rate=Decimal("100"), timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp1, sp2], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 2
+        assert len(specialists) == 2
+        mock_log.error.assert_not_called()
+        assert mock_add.call_count == 4
+        assert mock_update.call_count == 4
+
+    def test_sync_rates_negative_rate_logs_error_and_skips(self, project_service):
+        from decimal import Decimal
+
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test Project",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+
+        sp_valid = Specialist(
+            name="John", role="Dev", internal_rate=Decimal("100"),
+            external_rate=Decimal("120"), timesheet="ts-1", row_index=2,
+        )
+        sp_negative = Specialist(
+            name="Jane", role="QA", internal_rate=Decimal("-50"),
+            external_rate=Decimal("80"), timesheet="ts-2", row_index=3,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp_valid, sp_negative], 2)
+        )
+
+        mock_add = MagicMock()
+        mock_update = MagicMock()
+        project_service._projects.add_specialist_to_report = mock_add
+        project_service._projects.sync_rates_to_current_period = mock_update
+
+        with patch("feptm.timesheets.project_service.log") as mock_log:
+            specialists, updated = project_service.sync_project_rates("test-project-id")
+
+        assert updated == 1
+        assert len(specialists) == 2
+        mock_log.error.assert_called_once()
+        error_args = mock_log.error.call_args[0]
+        assert "Invalid rate for specialist '%s'" in error_args[0]
+        assert "Jane" in error_args[1]
+        assert "must be non-negative" in error_args[0]
+        assert "Previous rate retained" in error_args[0]
+        assert mock_add.call_count == 1
+        assert mock_update.call_count == 1
