@@ -41,25 +41,6 @@ def _has_duplicate_names(specialists: list[Specialist]) -> bool:
     return False
 
 
-def _has_invalid_dates(specialists: list[Specialist]) -> bool:
-    invalid = [
-        (sp.name, sp.row_index)
-        for sp in specialists
-        if sp.name and sp.date is None
-    ]
-    if invalid:
-        names = ", ".join(
-            f"'{n}' (row {r})" for n, r in invalid
-        )
-        log.error(
-            "Specialists with invalid dates in Team sheet: %s. "
-            "Aborting — fix date values in the Team sheet to resolve.",
-            names,
-        )
-        return True
-    return False
-
-
 class TimesheetProjectService:
     """Facade orchestrating project creation and specialist sync across storage."""
 
@@ -121,9 +102,6 @@ class TimesheetProjectService:
             return [], 0, 0
 
         if _has_duplicate_names(specialists):
-            return [], 0, 0
-
-        if _has_invalid_dates(specialists):
             return [], 0, 0
 
         new_count = 0
@@ -191,9 +169,6 @@ class TimesheetProjectService:
             return [], 0
 
         if _has_duplicate_names(specialists):
-            return [], 0
-
-        if _has_invalid_dates(specialists):
             return [], 0
 
         valid_specialists: list[Specialist] = []
@@ -266,8 +241,6 @@ class TimesheetProjectService:
         self,
         project_id: str,
         period_name: str,
-        start_date: datetime,
-        end_date: datetime,
     ) -> ClosePeriodResponse:
         project = self._projects.get_project_metadata(project_id)
         specialists, _ = self._specialists.list_from_sheet(project_id)
@@ -283,28 +256,31 @@ class TimesheetProjectService:
                 calculations_archived=False,
             )
 
-        if _has_invalid_dates(specialists):
-            return ClosePeriodResponse(
-                created=datetime.now(UTC),
-                project_id=project_id,
-                period_name=period_name,
-                entries_updated=0,
-                specialists_processed=0,
-                report_archived=False,
-                calculations_archived=False,
-            )
-
         total_entries = 0
         specialists_processed = 0
         report_archived = False
         calculations_archived = False
 
+        # Step 1: Archive Current Period FIRST (before timesheet updates)
+        # This captures hours before IMPORTRANGE formulas recalculate to 0
+        if project.report_spreadsheet_id:
+            report_archived = self._projects.archive_current_period(
+                project.report_spreadsheet_id,
+                period_name,
+            )
+        if project.calculations_spreadsheet_id:
+            calculations_archived = self._projects.archive_current_period(
+                project.calculations_spreadsheet_id,
+                period_name,
+            )
+
+        # Step 2: Update timesheet Payment Periods
         for sp in specialists:
             if not sp.timesheet:
                 continue
             ts_id = utils.extract_id_from_hyperlink_formula(sp.timesheet) or sp.timesheet
             updated = self._projects.close_period_in_timesheet(
-                ts_id, period_name, start_date, end_date
+                ts_id, period_name
             )
             specialists_processed += 1
             total_entries += updated
@@ -321,42 +297,25 @@ class TimesheetProjectService:
                     continue
                 ts_id = utils.extract_id_from_hyperlink_formula(sp.timesheet) or sp.timesheet
                 updated = self._projects.close_period_in_timesheet(
-                    ts_id, period_name, start_date, end_date
+                    ts_id, period_name
                 )
                 specialists_processed += 1
                 total_entries += updated
 
-        all_specialists = specialists + stale_specialists
-
+        # Step 3: Protect archived sheets if entries were updated
         if total_entries > 0:
-            if project.report_spreadsheet_id:
-                report_archived = self._projects.archive_current_period(
+            if report_archived and project.report_spreadsheet_id:
+                self._projects.protect_archived_sheet(
                     project.report_spreadsheet_id,
                     period_name,
-                    all_specialists,
-                    start_date,
-                    end_date,
+                    payment_status_col_idx=5,
                 )
-                if report_archived:
-                    self._projects.protect_archived_sheet(
-                        project.report_spreadsheet_id,
-                        period_name,
-                        payment_status_col_idx=5,
-                    )
-            if project.calculations_spreadsheet_id:
-                calculations_archived = self._projects.archive_current_period(
+            if calculations_archived and project.calculations_spreadsheet_id:
+                self._projects.protect_archived_sheet(
                     project.calculations_spreadsheet_id,
                     period_name,
-                    all_specialists,
-                    start_date,
-                    end_date,
+                    payment_status_col_idx=5,
                 )
-                if calculations_archived:
-                    self._projects.protect_archived_sheet(
-                        project.calculations_spreadsheet_id,
-                        period_name,
-                        payment_status_col_idx=5,
-                    )
         if project.report_spreadsheet_id:
             removed = self._projects.remove_stale_specialists(
                 project.report_spreadsheet_id, active_names

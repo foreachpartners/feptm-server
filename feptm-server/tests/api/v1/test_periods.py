@@ -1,6 +1,5 @@
 """Tests for period API endpoints."""
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -30,8 +29,6 @@ def test_close_payment_period_success(mock_get_service, client: TestClient):
         json={
             "project_id": "test-project-id",
             "period_name": "January 2026",
-            "start_date": "2026-01-01T00:00:00Z",
-            "end_date": "2026-01-31T00:00:00Z",
         },
     )
 
@@ -62,8 +59,6 @@ def test_close_payment_period_no_entries(mock_get_service, client: TestClient):
         json={
             "project_id": "test",
             "period_name": "Q1",
-            "start_date": "2026-06-01T00:00:00Z",
-            "end_date": "2026-06-30T00:00:00Z",
         },
     )
 
@@ -80,8 +75,6 @@ def test_close_payment_period_empty_period_name(client: TestClient):
         json={
             "project_id": "test",
             "period_name": "",
-            "start_date": "2026-01-01T00:00:00Z",
-            "end_date": "2026-01-31T00:00:00Z",
         },
     )
     assert response.status_code == 422
@@ -106,8 +99,6 @@ def test_close_payment_period_service_error(mock_get_service, client: TestClient
         json={
             "project_id": "test",
             "period_name": "Q1",
-            "start_date": "2026-01-01T00:00:00Z",
-            "end_date": "2026-01-31T00:00:00Z",
         },
     )
     assert response.status_code == 500

@@ -1,7 +1,5 @@
 """Tests for payment period models."""
 
-from datetime import datetime, timezone
-
 import pytest
 from pydantic import ValidationError
 
@@ -13,21 +11,15 @@ class TestClosePeriodRequest:
         req = ClosePeriodRequest(
             project_id="test-project",
             period_name="January 2026",
-            start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2026, 1, 31, tzinfo=timezone.utc),
         )
         assert req.project_id == "test-project"
         assert req.period_name == "January 2026"
-        assert req.start_date == datetime(2026, 1, 1, tzinfo=timezone.utc)
-        assert req.end_date == datetime(2026, 1, 31, tzinfo=timezone.utc)
 
     def test_empty_project_id_raises(self):
         with pytest.raises(ValidationError):
             ClosePeriodRequest(
                 project_id="",
                 period_name="Q1",
-                start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                end_date=datetime(2026, 1, 31, tzinfo=timezone.utc),
             )
 
     def test_empty_period_name_raises(self):
@@ -35,8 +27,6 @@ class TestClosePeriodRequest:
             ClosePeriodRequest(
                 project_id="test",
                 period_name="",
-                start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                end_date=datetime(2026, 1, 31, tzinfo=timezone.utc),
             )
 
 

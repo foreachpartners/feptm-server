@@ -17,8 +17,6 @@ async def close_payment_period(request: ClosePeriodRequest) -> ClosePeriodRespon
         return service.close_period(
             project_id=request.project_id,
             period_name=request.period_name,
-            start_date=request.start_date,
-            end_date=request.end_date,
         )
     except HTTPException:
         raise

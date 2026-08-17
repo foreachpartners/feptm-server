@@ -1,0 +1,19 @@
+created: '2026-08-17'
+description: Remove date filter from close_period and copy Current Period for archive
+fr_ids:
+- FR-PAYMENT-001
+- FR-SPECIALIST-001
+repos:
+- feptm-server
+- feptm-analysis
+ceremony: medium
+status: done
+baseline_policy: ignore
+sessions:
+  init: SID-1786986949-c37bed1a
+  plan: SID-1786987016-49b6e0c7
+  implement: SID-1786987626-387aa3af
+  finalize: SID-1786988409-c2920bee
+  plan_fix2: SID-1786989429-2d754eea
+  implement_fix2: SID-1786989520-3e865ffb
+  finalize_fix2: SID-1786989974-4e6a5dd7

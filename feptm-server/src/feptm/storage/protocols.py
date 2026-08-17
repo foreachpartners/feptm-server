@@ -1,6 +1,5 @@
 """Protocol interfaces for storage abstraction layer."""
 
-from datetime import datetime
 from typing import Protocol
 
 from feptm.models.context import TimesheetContext
@@ -58,8 +57,6 @@ class ProjectStorageProtocol(Protocol):
         self,
         timesheet_id: str,
         period_name: str,
-        start_date: datetime,
-        end_date: datetime,
     ) -> int:
         """Write period_name to Payment Period column for matching entries in a timesheet."""
         ...
@@ -68,9 +65,6 @@ class ProjectStorageProtocol(Protocol):
         self,
         spreadsheet_id: str,
         period_name: str,
-        specialists: list[Specialist],
-        start_date: datetime,
-        end_date: datetime,
     ) -> bool:
         """Copy Current Period structure to period_name with values computed from timesheet data."""
         ...

@@ -8,8 +8,6 @@ from pydantic import BaseModel, Field
 class ClosePeriodRequest(BaseModel):
     project_id: str = Field(..., min_length=1, description="Project ID cannot be empty")
     period_name: str = Field(..., min_length=1, description="Period name cannot be empty")
-    start_date: datetime
-    end_date: datetime
 
 
 class ClosePeriodResponse(BaseModel):

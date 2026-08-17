@@ -257,116 +257,11 @@ class TestProjectStorage:
             value_input_option="USER_ENTERED",
         )
 
-    def test_archive_current_period_writes_period_column(self, project_storage, mock_sheets):
-        from datetime import datetime, timezone
-
-        from feptm.models.specialist import Specialist
-
-        sp = Specialist(
-            name="John", role="Dev", timesheet="ts-1",
-            internal_rate="100", external_rate="120",
-        )
-        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
+    def test_archive_current_period_copies_tab(self, project_storage, mock_sheets):
+        headers = ["Specialist", "Hours Worked", "Total Cost (USD)", "Period"]
         cp_values = [
-            ["Specialist", "Hours Worked", "Total Cost (USD)"],
-            ["John", "", ""],
-        ]
-        sheet_dict = {"properties": {"sheetId": 1}}
-        cp_data = (cp_values, headers, sheet_dict)
-
-        project_storage._list_sheet_titles = MagicMock(return_value=[])
-        project_storage._read_current_period = MagicMock(return_value=cp_data)
-        project_storage._sum_period_hours = MagicMock(return_value=10.0)
-
-        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
-
-        result = project_storage.archive_current_period(
-            "spreadsheet-id", "Aug 2026", [sp], start, end,
-        )
-
-        assert result is True
-        project_storage._sum_period_hours.assert_called_once_with(
-            "ts-1", start, end, "Aug 2026"
-        )
-
-        update_call = mock_sheets.update_range.call_args
-        values = update_call[1]["values"]
-
-        assert len(values) == 3
-        assert "Period" in values[0]
-        period_idx = values[0].index("Period")
-        cost_idx = values[0].index("Total Cost (USD)")
-        hours_idx = values[0].index("Hours Worked")
-
-        assert values[1][period_idx] == "Aug 2026"
-        assert values[1][cost_idx] == 1200.0
-
-        assert values[2][0] == ""
-        assert values[2][hours_idx] == 10.0
-        assert values[2][cost_idx] == 1200.0
-        assert values[2][period_idx] == "Aug 2026"
-
-    def test_archive_current_period_excludes_empty_timesheet(self, project_storage, mock_sheets):
-        from datetime import datetime, timezone
-
-        from feptm.models.specialist import Specialist
-
-        sp_no_ts = Specialist(
-            name="Jane", role="QA", timesheet="",
-            internal_rate="80", external_rate="100",
-        )
-        sp_with_ts = Specialist(
-            name="John", role="Dev", timesheet="ts-1",
-            internal_rate="100", external_rate="120",
-        )
-        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
-        cp_values = [
-            ["Specialist", "Hours Worked", "Total Cost (USD)"],
-            ["Jane", "", ""],
-            ["John", "", ""],
-        ]
-        sheet_dict = {"properties": {"sheetId": 1}}
-        cp_data = (cp_values, headers, sheet_dict)
-
-        project_storage._list_sheet_titles = MagicMock(return_value=[])
-        project_storage._read_current_period = MagicMock(return_value=cp_data)
-        project_storage._sum_period_hours = MagicMock(return_value=10.0)
-
-        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
-
-        result = project_storage.archive_current_period(
-            "spreadsheet-id", "Aug 2026", [sp_no_ts, sp_with_ts], start, end,
-        )
-
-        assert result is True
-        update_call = mock_sheets.update_range.call_args
-        values = update_call[1]["values"]
-
-        assert len(values) == 3
-        assert "Jane" not in [row[0] for row in values[1:]]
-        assert values[1][0] == "John"
-        assert values[2][0] == ""
-
-    def test_archive_current_period_excludes_zero_hours(self, project_storage, mock_sheets):
-        from datetime import datetime, timezone
-
-        from feptm.models.specialist import Specialist
-
-        sp_zero = Specialist(
-            name="Anna", role="Dev", timesheet="ts-1",
-            internal_rate="100", external_rate="120",
-        )
-        sp_has_hours = Specialist(
-            name="John", role="Dev", timesheet="ts-2",
-            internal_rate="100", external_rate="120",
-        )
-        headers = ["Specialist", "Hours Worked", "Total Cost (USD)"]
-        cp_values = [
-            ["Specialist", "Hours Worked", "Total Cost (USD)"],
-            ["Anna", "", ""],
-            ["John", "", ""],
+            ["Specialist", "Hours Worked", "Total Cost (USD)", "Period"],
+            ["John", "10", "1200", ""],
         ]
         sheet_dict = {"properties": {"sheetId": 1}}
         cp_data = (cp_values, headers, sheet_dict)
@@ -374,62 +269,27 @@ class TestProjectStorage:
         project_storage._list_sheet_titles = MagicMock(return_value=[])
         project_storage._read_current_period = MagicMock(return_value=cp_data)
 
-        def sum_hours(ts_id, s, e, p):
-            return 0.0 if ts_id == "ts-1" else 10.0
-        project_storage._sum_period_hours = MagicMock(side_effect=sum_hours)
-
-        start = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        end = datetime(2026, 8, 31, tzinfo=timezone.utc)
-
         result = project_storage.archive_current_period(
-            "spreadsheet-id", "Aug 2026", [sp_zero, sp_has_hours], start, end,
+            "spreadsheet-id", "Aug 2026",
         )
 
         assert result is True
-        update_call = mock_sheets.update_range.call_args
-        values = update_call[1]["values"]
+        # Verify duplicateSheet was called
+        batch_update_calls = mock_sheets.batch_update.call_args_list
+        assert len(batch_update_calls) >= 1
+        duplicate_request = batch_update_calls[0][1]["requests"][0]
+        assert "duplicateSheet" in duplicate_request
+        assert duplicate_request["duplicateSheet"]["newSheetName"] == "Aug 2026"
 
-        assert len(values) == 3
-        assert "Anna" not in [row[0] for row in values[1:]]
-        assert values[1][0] == "John"
-        assert values[2][0] == ""
+    def test_archive_current_period_skips_if_exists(self, project_storage, mock_sheets):
+        project_storage._list_sheet_titles = MagicMock(return_value=["Aug 2026"])
 
+        result = project_storage.archive_current_period(
+            "spreadsheet-id", "Aug 2026",
+        )
 
-class TestSerialToDate:
-
-    def test_accepts_dd_mm_yyyy(self):
-        from feptm.storage.project_storage import _serial_to_date
-
-        result = _serial_to_date("01.02.2026")
-        assert result is not None
-        assert result.year == 2026
-        assert result.month == 2
-        assert result.day == 1
-
-    def test_rejects_yyyy_mm_dd(self):
-        from feptm.storage.project_storage import _serial_to_date
-
-        assert _serial_to_date("2026-02-01") is None
-
-    def test_rejects_mm_dd_yyyy(self):
-        from feptm.storage.project_storage import _serial_to_date
-
-        assert _serial_to_date("02/01/2026") is None
-
-    def test_accepts_numeric_serial(self):
-        from feptm.storage.project_storage import _serial_to_date
-
-        result = _serial_to_date(46054)   # 2026-02-01
-        assert result is not None
-        assert result.year == 2026
-        assert result.month == 2
-        assert result.day == 1
-
-    def test_rejects_empty(self):
-        from feptm.storage.project_storage import _serial_to_date
-
-        assert _serial_to_date("") is None
-        assert _serial_to_date(None) is None
+        assert result is False
+        mock_sheets.batch_update.assert_not_called()
 
 
 class TestParseDecimal:
@@ -647,44 +507,6 @@ class TestProjectServiceFacade:
         mock_add.assert_not_called()
         mock_update.assert_not_called()
 
-    def test_sync_aborts_on_invalid_dates(self, project_service):
-        from unittest.mock import patch
-
-        from feptm.models.project import Project
-        from feptm.models.specialist import Specialist
-
-        project = Project(
-            name="Test Project",
-            drive_folder_id="folder-id",
-            project_info_spreadsheet_id="info-id",
-            report_spreadsheet_id="report-id",
-        )
-        project_service._projects.get_project_metadata = MagicMock(
-            return_value=project
-        )
-
-        sp = Specialist(
-            name="John", role="Dev", timesheet="ts-1",
-            row_index=2, date=None,
-        )
-        project_service._specialists.list_from_sheet = MagicMock(
-            return_value=([sp], 1)
-        )
-
-        mock_add = MagicMock()
-        mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.update_current_period = mock_update
-
-        with patch("feptm.timesheets.project_service.log") as mock_log:
-            result = project_service.sync_project_specialists("test-project-id")
-
-        assert result == ([], 0, 0)
-        mock_log.error.assert_called_once()
-        assert "invalid dates" in mock_log.error.call_args[0][0]
-        mock_add.assert_not_called()
-        mock_update.assert_not_called()
-
     def test_sync_no_collision_proceeds_normally(self, project_service):
         from decimal import Decimal
 
@@ -766,8 +588,6 @@ class TestProjectServiceFacade:
         mock_update.assert_not_called()
 
     def test_close_period_matching_entries(self, project_service):
-        from datetime import datetime, timezone
-
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -800,8 +620,6 @@ class TestProjectServiceFacade:
         result = project_service.close_period(
             "test-id",
             "January 2026",
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            datetime(2026, 1, 31, tzinfo=timezone.utc),
         )
 
         assert result.entries_updated == 5
@@ -847,23 +665,19 @@ class TestProjectServiceFacade:
         result = project_service.close_period(
             "test-id",
             "Q2",
-            datetime(2026, 4, 1, tzinfo=timezone.utc),
-            datetime(2026, 6, 30, tzinfo=timezone.utc),
         )
 
         assert result.entries_updated == 0
         assert result.specialists_processed == 1
-        assert result.report_archived is False
+        assert result.report_archived is True  # Archive is called FIRST, before timesheet updates
         assert result.calculations_archived is False
-        project_service._projects.archive_current_period.assert_not_called()
-        project_service._projects.protect_archived_sheet.assert_not_called()
+        project_service._projects.archive_current_period.assert_called_once()
+        project_service._projects.protect_archived_sheet.assert_not_called()  # Not protected because total_entries == 0
         project_service._projects.remove_stale_specialists.assert_called_once_with(
             "report-id", {"John"}
         )
 
     def test_close_period_no_timesheet_specialists(self, project_service):
-        from datetime import datetime, timezone
-
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -886,8 +700,6 @@ class TestProjectServiceFacade:
         result = project_service.close_period(
             "test-id",
             "Q1",
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            datetime(2026, 3, 31, tzinfo=timezone.utc),
         )
 
         assert result.entries_updated == 0
@@ -896,8 +708,6 @@ class TestProjectServiceFacade:
         project_service._projects.archive_current_period.assert_not_called()
 
     def test_close_period_none_report_calculations(self, project_service):
-        from datetime import datetime, timezone
-
         from feptm.models.project import Project
         from feptm.models.specialist import Specialist
 
@@ -925,8 +735,6 @@ class TestProjectServiceFacade:
         result = project_service.close_period(
             "test-id",
             "Q1",
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            datetime(2026, 3, 31, tzinfo=timezone.utc),
         )
 
         assert result.entries_updated == 3
