@@ -1,0 +1,50 @@
+id: FR-TEMPLATE-001
+title: Create project spreadsheets and specialist timesheets from Google templates
+description: |
+  The Project Manager creates a project. The system creates a project folder
+  and copies the Project info, General Expenses, and Payment Distribution
+  Google templates into it. File names are "{project} - Project info",
+  "{project} - General Expenses", and "{project} - Payment Distribution".
+  The system does not create specialist timesheets at this step.
+
+  Template tabs are copied as they are. The Project info template already
+  contains the Project info and Team tabs. The General Expenses and Payment
+  Distribution templates already contain the Current period tab. The system
+  does not add these tabs separately when creating the project.
+
+  After the copy, the system writes project metadata and links to the
+  project folder, General Expenses, and Payment Distribution into the
+  Project info tab. General Expenses and Payment Distribution remain a
+  copy of their templates at project creation.
+
+  The system creates a specialist timesheet later, during sync or
+  sync-rates, when the specialist has no timesheet in Team. It copies the
+  timesheet template into the project folder as
+  "Time Tracking for {name}. Project {project}". If a file with that name
+  already exists in the folder, the system does not copy the template
+  again.
+
+priority: must
+
+acceptance_criteria:
+  - "When creating a project, the system creates a project folder and copies the Project info, General Expenses, and Payment Distribution templates into it."
+  - "The spreadsheet file names are \"{project} - Project info\", \"{project} - General Expenses\", and \"{project} - Payment Distribution\"."
+  - "When creating a project, the system does not create specialist timesheets."
+  - "The Project info copy contains the Project info and Team tabs as in the template. The system does not recreate these tabs when creating the project."
+  - "The General Expenses and Payment Distribution copies contain the Current period tab as in the template. The system does not recreate this tab when creating the project."
+  - "After the copy, the system writes metadata and links to the project folder, General Expenses, and Payment Distribution into the Project info tab."
+  - "At project creation, General Expenses and Payment Distribution remain a copy of their templates."
+  - "During sync and sync-rates, if a specialist has no timesheet in Team, the system creates a timesheet by copying the timesheet template into the project folder as \"Time Tracking for {name}. Project {project}\"."
+  - "If a timesheet with that name already exists in the project folder, the system does not copy it again."
+
+implements:
+  - src/feptm/api/v1/projects.py::create_project
+  - src/feptm/api/v1/projects.py::sync_project_specialists
+  - src/feptm/api/v1/projects.py::sync_project_rates
+  - src/feptm/storage/project_storage.py::_create_from_template
+  - src/feptm/storage/specialist_storage.py::create_timesheet
+  - src/feptm/services/google_sheets_service.py::copy_spreadsheet_from_template
+  - src/feptm/core/config.py
+
+revision_history:
+  - "v1 (2026-08-18): create copies Project info, General Expenses, and Payment Distribution and does not create timesheets; timesheet copy from template runs on sync and sync-rates when Team has no timesheet file; deduplicate by file name in the project folder."

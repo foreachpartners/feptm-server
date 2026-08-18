@@ -1,0 +1,45 @@
+id: FR-FORMULA-001
+title: Apply config formulas in General Expenses and Payment Distribution
+description: |
+  The system takes hours, cost, and revenue formulas from the Formulas
+  tab of the configuration spreadsheet and applies them in the Current
+  period of General Expenses and Payment Distribution.
+
+  The first specialist in Current period occupies row 2 and receives
+  these formulas. Each next specialist receives the same calculation
+  rules as the last specialist already in Current period; the row
+  calculates that specialist's data. If Current period has no
+  specialist yet, the system takes the formulas from Formulas. If
+  applying an existing specialist's formulas to the new row fails, the
+  system does not fill the new row from Formulas.
+
+  A repeat specialist sync does not change hours and amount formulas,
+  rates, or column J in a specialist row that already exists in Current
+  period. Rate sync updates rates and column J in Payment Distribution
+  and does not change hours and amount formulas. The system writes the
+  specialist timesheet import formula from Formulas onto the
+  specialist's named tab in General Expenses and Payment Distribution.
+  Sync and sync-rates refresh that import formula.
+
+priority: must
+
+acceptance_criteria:
+  - "Hours, cost, and revenue formulas are stored on the Formulas tab of the configuration spreadsheet and are defined for Current period row 2."
+  - "The first specialist in Current period of General Expenses and Payment Distribution occupies row 2 and receives hours, cost, and revenue formulas from Formulas."
+  - "Each next specialist in Current period receives the same hours, cost, and revenue formulas as the last specialist on that tab. Formulas in the new row calculate cells in that same row."
+  - "If Current period has no specialist, the system fills hours, cost, and revenue formulas from Formulas."
+  - "If the system cannot apply an existing specialist's formulas to the new row, it does not fill that row from Formulas."
+  - "A repeat specialist sync does not change hours, cost, and revenue formulas, rates, or column J in a specialist row that already exists in Current period."
+  - "Rate sync updates rates in the existing Current period row and column J in Payment Distribution and does not change hours, cost, and revenue formulas."
+  - "The system takes the timesheet import formula from Formulas, substitutes the specialist timesheet link, and writes it to the tab named after the specialist in General Expenses and Payment Distribution."
+  - "Sync and sync-rates refresh the import formula on the specialist's tab."
+  - "Column J in Payment Distribution does not come from Formulas. It shows a summary of the same specialist row: name, project, period, hours, rate, and total."
+
+implements:
+  - src/feptm/storage/config_storage.py
+  - src/feptm/storage/project_storage.py
+  - src/feptm/timesheets/project_service.py
+  - src/feptm/timesheets/config_service.py
+
+revision_history:
+  - "v1 (2026-08-18): Current period formulas from Formulas; first specialist on row 2; later rows use the same rules and calculate themselves; Formulas only when no specialist exists yet; apply failure does not fill from Formulas; timesheet import on the specialist tab on sync and sync-rates; rates and column J on sync-rates."
