@@ -1,0 +1,16 @@
+created: '2026-08-19'
+description: Remove _add_formulas_for_row; always copy formulas from template row
+  (last specialist or row 2); remove hardcoded column J formula
+fr_ids:
+- FR-FORMULA-001
+repos:
+- feptm-server
+ceremony: minimal
+status: implemented
+sessions:
+  init: SID-1787156153-1bdc120f
+  plan: SID-1787156253-ec23ce30
+  implement: SID-1787156834-51878fdd
+  re-plan: SID-1787157795-120f3763
+  re-implement: SID-1787158845-b8419b4d
+  finalize: SID-1787160693-8bc66e11
