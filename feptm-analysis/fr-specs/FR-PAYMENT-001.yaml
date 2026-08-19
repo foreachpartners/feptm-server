@@ -2,10 +2,16 @@ id: FR-PAYMENT-001
 title: Close payment periods and archive reports
 description: |
   The Project Manager closes a payment period by providing project_id and
-  period_name without start_date and end_date. The system selects every work
-  entry with an empty Payment Period from project specialists' personal
-  timesheets and creates calculation snapshots in General Expenses and
-  Payment Distribution.
+  period_name without start_date and end_date. If no archived tab named
+  period_name exists, the system selects every entry with an empty Payment
+  Period from project specialists' timesheets and creates calculation
+  snapshots in General Expenses and Payment Distribution. A newly created
+  archived tab is placed at the end of the spreadsheet's tab list.
+
+  If an archived tab named period_name already exists, closure is a no-op:
+  the system does not create or modify archived tabs, does not write
+  period_name to the Payment Period column in timesheets, and does not
+  modify Current Period.
 
   Hours, rates, amounts, and totals in archived tabs are fixed and protected.
   Payment Status cells remain available to the Project Manager for recording
@@ -15,17 +21,18 @@ priority: must
 
 acceptance_criteria:
   - "The system accepts project_id and a non-empty period_name without start_date and end_date."
-  - "The system includes every work entry with an empty Payment Period from project specialists' personal timesheets."
-  - "The value and format of Date do not affect work entry selection."
-  - "In each specialist's personal timesheet, the system writes period_name to the Payment Period column of every included entry."
-  - "If project specialists' personal timesheets contain no work entries with an empty Payment Period, the system does not create archived tabs or modify timesheets or Current Period."
-  - "The system creates copies of Current Period named period_name in General Expenses and Payment Distribution."
-  - "If an archived tab named period_name already exists, the system skips its creation and does not modify it."
+  - "If no archived tab named period_name exists, the system includes every entry with an empty Payment Period from project specialists' timesheets."
+  - "The value and format of Date do not affect entry selection."
+  - "When archived tabs are created, the system writes period_name to the Payment Period column of every included entry in the specialist's timesheet."
+  - "If project specialists' timesheets contain no entries with an empty Payment Period, the system does not create archived tabs or modify timesheets or Current Period."
+  - "If no archived tab named period_name exists, the system creates copies of Current Period named period_name in General Expenses and Payment Distribution."
+  - "When archived tabs are created, the system places each new tab at the end of the spreadsheet's tab list."
+  - "If an archived tab named period_name already exists, the system skips its creation and does not modify it, does not write period_name to the Payment Period column in timesheets, and does not modify Current Period."
   - "The system writes period_name to the Period column in the archived tabs of General Expenses and Payment Distribution."
   - "Archived tabs contain fully recalculated hours, rates, amounts, and totals for the included entries, with formulas replaced by their values."
   - "Changes to source hours or rates after closure do not change archived values."
   - "In archived tabs and specialist timesheets, the system creates strict Protected Ranges for all cells except Payment Status cells defined by the templates; only the document owner can edit protected cells."
-  - "After closure, work entries with a non-empty Payment Period are no longer included in Current Period; Current Period includes only work entries with an empty Payment Period."
+  - "After closure, entries with a non-empty Payment Period are no longer included in Current Period; Current Period includes only entries with an empty Payment Period."
 
 implements:
   - src/feptm/api/v1/periods.py::close_payment_period
@@ -36,4 +43,5 @@ implements:
 
 revision_history:
   - "v1 (2026-08-11, commit TBD): when closing a payment period, the system records period_name in the Period column of the archived General Expenses and Payment Distribution tabs."
-  - "v2 (2026-08-14, commit TBD): payment period closure uses project_id and period_name without start_date and end_date, includes every work entry with an empty Payment Period from project specialists' personal timesheets, and does not use Date for entry selection."
+  - "v2 (2026-08-14, commit TBD): payment period closure uses project_id and period_name without start_date and end_date, includes every entry with an empty Payment Period from project specialists' timesheets, and does not use Date for entry selection."
+  - "v3 (2026-08-19, commit TBD): if an archived tab named period_name already exists, closure does not write period_name to the Payment Period column in timesheets and does not modify Current Period; a newly created archived tab is placed at the end of the tab list."
