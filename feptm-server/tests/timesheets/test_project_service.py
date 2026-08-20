@@ -274,12 +274,13 @@ class TestProjectStorage:
         )
 
         assert result is True
-        # Verify duplicateSheet was called
+        # Verify duplicateSheet was called with insertSheetIndex at end
         batch_update_calls = mock_sheets.batch_update.call_args_list
         assert len(batch_update_calls) >= 1
         duplicate_request = batch_update_calls[0][1]["requests"][0]
         assert "duplicateSheet" in duplicate_request
         assert duplicate_request["duplicateSheet"]["newSheetName"] == "Aug 2026"
+        assert duplicate_request["duplicateSheet"]["insertSheetIndex"] == 0
 
     def test_archive_current_period_skips_if_exists(self, project_storage, mock_sheets):
         project_storage._list_sheet_titles = MagicMock(return_value=["Aug 2026"])
@@ -290,6 +291,36 @@ class TestProjectStorage:
 
         assert result is False
         mock_sheets.batch_update.assert_not_called()
+
+    def test_archive_current_period_skips_total_row(self, project_storage, mock_sheets):
+        headers = ["Specialist", "Hours Worked", "Total Cost (USD)", "Period"]
+        cp_values = [
+            ["Specialist", "Hours Worked", "Total Cost (USD)", "Period"],
+            ["John", "10", "1200", ""],
+            ["Jane", "20", "2400", ""],
+            ["", "30", "3600", ""],
+        ]
+        sheet_dict = {"properties": {"sheetId": 1}}
+        cp_data = (cp_values, headers, sheet_dict)
+
+        project_storage._list_sheet_titles = MagicMock(return_value=[])
+        project_storage._read_current_period = MagicMock(return_value=cp_data)
+        mock_sheets.column_index_to_letter.side_effect = lambda idx: chr(65 + idx)
+
+        result = project_storage.archive_current_period(
+            "spreadsheet-id", "Aug 2026",
+        )
+
+        assert result is True
+        update_range_calls = [
+            call for call in mock_sheets.update_range.call_args_list
+            if "Aug 2026!" in call.kwargs.get("range_name", "")
+        ]
+        assert len(update_range_calls) >= 1
+        period_call = [c for c in update_range_calls if "!D2:D4" in c.kwargs.get("range_name", "")]
+        assert len(period_call) == 1
+        period_values = period_call[0].kwargs["values"]
+        assert period_values == [["Aug 2026"], ["Aug 2026"], [""]]
 
 
 class TestParseDecimal:

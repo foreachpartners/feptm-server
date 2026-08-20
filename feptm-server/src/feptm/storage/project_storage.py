@@ -558,12 +558,13 @@ class ProjectStorage:
         if cp_sheet_id is None:
             return False
 
-        # Duplicate Current Period tab
+        # Duplicate Current Period tab at the end of the sheets list
         self._sheets.batch_update(
             spreadsheet_id=spreadsheet_id,
             requests=[{
                 "duplicateSheet": {
                     "sourceSheetId": cp_sheet_id,
+                    "insertSheetIndex": len(existing),
                     "newSheetName": period_name,
                 }
             }],
@@ -591,12 +592,22 @@ class ProjectStorage:
                 value_input_option="RAW",
             )
 
-        # Find Period column and write period_name to all data rows
+        # Find Period column and write period_name to data rows (skip total rows)
         period_idx = _find_column_contains(headers, ColumnName.PERIOD.value)
         if period_idx is not None and len(values) > 1:
             period_col_letter = self._sheets.column_index_to_letter(period_idx)
             period_range = f"{period_name}!{period_col_letter}2:{period_col_letter}{len(values)}"
-            period_values = [[period_name]] * (len(values) - 1)
+            
+            specialist_idx = 0
+            period_values = []
+            for i in range(1, len(values)):
+                row = values[i]
+                _pad_row(row, len(headers))
+                if row[specialist_idx]:
+                    period_values.append([period_name])
+                else:
+                    period_values.append([""])
+            
             self._sheets.update_range(
                 spreadsheet_id=spreadsheet_id,
                 range_name=period_range,
