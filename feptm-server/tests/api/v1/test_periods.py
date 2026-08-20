@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from feptm.core.exceptions import PeriodAlreadyClosedError
 from feptm.models.payment_period import ClosePeriodResponse
 
 
@@ -102,3 +103,22 @@ def test_close_payment_period_service_error(mock_get_service, client: TestClient
         },
     )
     assert response.status_code == 500
+
+
+@patch("feptm.api.v1.periods.get_timesheet_project_service")
+def test_close_payment_period_already_closed_returns_409(mock_get_service, client: TestClient):
+    mock_service = MagicMock()
+    mock_service.close_period.side_effect = PeriodAlreadyClosedError("January 2026")
+    mock_get_service.return_value = mock_service
+
+    response = client.put(
+        "/api/periods",
+        json={
+            "project_id": "test-project-id",
+            "period_name": "January 2026",
+        },
+    )
+
+    assert response.status_code == 409
+    data = response.json()
+    assert "already closed" in data["detail"]

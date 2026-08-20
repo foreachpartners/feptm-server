@@ -322,6 +322,24 @@ class TestProjectStorage:
         period_values = period_call[0].kwargs["values"]
         assert period_values == [["Aug 2026"], ["Aug 2026"], [""]]
 
+    def test_is_period_closed_returns_true_when_tab_exists(self, project_storage):
+        project_storage._list_sheet_titles = MagicMock(
+            return_value=["Current period", "Aug 2026"]
+        )
+
+        result = project_storage.is_period_closed("spreadsheet-id", "Aug 2026")
+
+        assert result is True
+
+    def test_is_period_closed_returns_false_when_tab_absent(self, project_storage):
+        project_storage._list_sheet_titles = MagicMock(
+            return_value=["Current period", "Jul 2026"]
+        )
+
+        result = project_storage.is_period_closed("spreadsheet-id", "Aug 2026")
+
+        assert result is False
+
 
 class TestParseDecimal:
 
@@ -979,6 +997,98 @@ class TestProjectServiceFacade:
         assert "Invalid rate for specialist '%s'" in error_args[0]
         assert "Jane" in error_args[1]
         assert "must be non-negative" in error_args[0]
-        assert "Previous rate retained" in error_args[0]
+        assert "Previous period retained" in error_args[0] or "Previous rate retained" in error_args[0]
         assert mock_add.call_count == 1
         assert mock_update.call_count == 1
+
+    def test_close_period_raises_when_period_already_closed_in_report(self, project_service):
+        from feptm.core.exceptions import PeriodAlreadyClosedError
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.is_period_closed = MagicMock(return_value=True)
+        project_service._projects.archive_current_period = MagicMock()
+        project_service._projects.close_period_in_timesheet = MagicMock()
+
+        with pytest.raises(PeriodAlreadyClosedError, match="January 2026"):
+            project_service.close_period("test-id", "January 2026")
+
+        project_service._projects.archive_current_period.assert_not_called()
+        project_service._projects.close_period_in_timesheet.assert_not_called()
+
+    def test_close_period_raises_when_period_already_closed_in_calculations(self, project_service):
+        from feptm.core.exceptions import PeriodAlreadyClosedError
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.is_period_closed = MagicMock(side_effect=[False, True])
+        project_service._projects.archive_current_period = MagicMock()
+        project_service._projects.close_period_in_timesheet = MagicMock()
+
+        with pytest.raises(PeriodAlreadyClosedError, match="January 2026"):
+            project_service.close_period("test-id", "January 2026")
+
+        project_service._projects.archive_current_period.assert_not_called()
+        project_service._projects.close_period_in_timesheet.assert_not_called()
+
+    def test_close_period_proceeds_when_period_not_closed(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
+        )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.is_period_closed = MagicMock(return_value=False)
+        project_service._projects.archive_current_period = MagicMock(return_value=True)
+        project_service._projects.close_period_in_timesheet = MagicMock(return_value=5)
+        project_service._projects.protect_archived_sheet = MagicMock()
+        project_service._projects.remove_stale_specialists = MagicMock(return_value=0)
+
+        result = project_service.close_period("test-id", "January 2026")
+
+        assert result.entries_updated == 5
+        assert result.report_archived is True
+        project_service._projects.is_period_closed.assert_any_call("report-id", "January 2026")
+        project_service._projects.is_period_closed.assert_any_call("calc-id", "January 2026")

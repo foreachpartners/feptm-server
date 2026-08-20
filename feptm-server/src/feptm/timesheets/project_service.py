@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from feptm.core.log import log
 from feptm.core import utils
+from feptm.core.exceptions import PeriodAlreadyClosedError
 from feptm.models.context import TimesheetContext
 from feptm.models.payment_period import ClosePeriodResponse
 from feptm.models.project import Project
@@ -255,6 +256,15 @@ class TimesheetProjectService:
                 report_archived=False,
                 calculations_archived=False,
             )
+
+        if project.report_spreadsheet_id and self._projects.is_period_closed(
+            project.report_spreadsheet_id, period_name
+        ):
+            raise PeriodAlreadyClosedError(period_name)
+        if project.calculations_spreadsheet_id and self._projects.is_period_closed(
+            project.calculations_spreadsheet_id, period_name
+        ):
+            raise PeriodAlreadyClosedError(period_name)
 
         total_entries = 0
         specialists_processed = 0

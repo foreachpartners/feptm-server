@@ -618,6 +618,14 @@ class ProjectStorage:
         log.info("Archived Current Period as %s in spreadsheet", period_name)
         return True
 
+    def is_period_closed(
+        self,
+        spreadsheet_id: str,
+        period_name: str,
+    ) -> bool:
+        existing = self._list_sheet_titles(spreadsheet_id)
+        return period_name in existing
+
     def remove_stale_specialists(
         self,
         spreadsheet_id: str,

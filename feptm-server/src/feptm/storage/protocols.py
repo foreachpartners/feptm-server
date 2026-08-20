@@ -94,6 +94,14 @@ class ProjectStorageProtocol(Protocol):
         """Remove Current Period rows for specialists not present in active_names."""
         ...
 
+    def is_period_closed(
+        self,
+        spreadsheet_id: str,
+        period_name: str,
+    ) -> bool:
+        """Check if a tab with period_name already exists (period already closed)."""
+        ...
+
 
 class SpecialistStorageProtocol(Protocol):
     """Protocol for specialist-scoped spreadsheet operations."""

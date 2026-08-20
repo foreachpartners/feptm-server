@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
+from feptm.core.exceptions import PeriodAlreadyClosedError
 from feptm.dependencies import get_timesheet_project_service
 from feptm.models.payment_period import ClosePeriodRequest, ClosePeriodResponse
 from feptm.timesheets.project_service import TimesheetProjectService
@@ -17,6 +18,10 @@ async def close_payment_period(request: ClosePeriodRequest) -> ClosePeriodRespon
         return service.close_period(
             project_id=request.project_id,
             period_name=request.period_name,
+        )
+    except PeriodAlreadyClosedError as e:
+        raise HTTPException(
+            status_code=409, detail=str(e)
         )
     except HTTPException:
         raise
