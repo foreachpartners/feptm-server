@@ -1,0 +1,26 @@
+id: FR-PROJECT-001
+title: Show the project list on the shared dashboard URL
+description: |
+  The user opens one shared dashboard URL. There is no sign-in and no roles.
+  The first page is the project list.
+
+  Entry: the dashboard URL in the browser. Exit on project-name click: that
+  project's card in the same tab. Exit on Create project: the create form
+  (FR-PROJECT-002) as an overlay on the list.
+
+  The dashboard shows project names from a single list request to the server.
+  An empty list response is not a request failure.
+
+priority: must
+
+acceptance_criteria:
+  - "Opening the dashboard URL shows the dashboard immediately: no sign-in form, no login field, no password field."
+  - "Opening the dashboard URL shows the dashboard heading \"FEP Projects Dashboard\", the \"Create project\" button, and the project-name list."
+  - "The dashboard displays the project names returned by a single server list request."
+  - "List rows are sorted alphabetically by project name, case-insensitive."
+  - "While the list is loading, a loading state is visible and the \"Create project\" button stays enabled."
+  - "An empty server list response shows the text \"no projects\" and the \"Create project\" button."
+  - "A failed list request shows the text \"Failed to load the project list. Refresh the page or try again later.\" The \"Create project\" button stays visible and enabled."
+  - "A click on a project name opens that project's card in the same browser tab, not a new window."
+  - "A click on \"Create project\" opens the create form as an overlay on the list."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, ForEach Partners header logo, primary button as on buttons.png / header.png, list as cards.png / heading.png. MUST NOT copy marketing landing copy or the chat widget."
