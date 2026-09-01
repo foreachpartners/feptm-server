@@ -1,0 +1,26 @@
+id: FR-PROJECT-002
+title: Create a project from the dashboard by name
+description: |
+  The user creates a project from the dashboard. Drive folder and spreadsheets
+  are FR-TEMPLATE-001.
+
+  Entry: the Create project button on the dashboard (FR-PROJECT-001). The form
+  is an overlay on the dashboard. Success: the new project's card in the same
+  tab. Cancel or error: the dashboard; the project does not appear in the list.
+
+priority: must
+
+depends_on:
+  - FR-PROJECT-001
+  - FR-TEMPLATE-001
+
+acceptance_criteria:
+  - "The create overlay opens on the dashboard, not in a new tab and not as a separate page without the dashboard behind it."
+  - "While the overlay is open, a click on the dimmed dashboard behind it does not create a project and does not open a project card. The list under the overlay is not clickable."
+  - "Project name is required. While the field is empty or whitespace-only, the Create button is disabled and no create request is sent."
+  - "Cancel closes the overlay and shows the dashboard list in the same tab. The new project does not appear in the list."
+  - "While creation is in progress, the status is Creating..., the overlay cannot be closed, and Create and Cancel are disabled. A repeated Create click does not send a second request."
+  - "Server error and network timeout show the same text on the form: \"Failed to create the project. Try again later.\" The overlay stays open. The project does not appear in the list. Create and Cancel are enabled again: the user MAY retry or leave the overlay to the dashboard."
+  - "The server rejects creating a project whose name already exists. Duplicates MUST NOT appear. The form shows \"Failed to create the project. Try again later.\" The overlay stays open. A second row with that name MUST NOT appear in the list. Create and Cancel are enabled again."
+  - "On success the overlay closes and the created project's card opens in the same tab. After return to the list, the created project's name is in the list."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, Create as the primary button on buttons.png / header.png, Cancel as the secondary button on buttons.png / footer.png. No input-field snapshot exists: the field and overlay use the same dark colors and cyan buttons as the snapshots. MUST NOT copy marketing landing copy or the chat widget."

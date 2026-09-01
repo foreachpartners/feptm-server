@@ -6,9 +6,25 @@ description: |
   timesheet IDs back to the Team sheet, adds specialists to Current Period
   sheets in report/calculation spreadsheets, and propagates rate changes.
 
-  Each step must complete correctly before the next can function. Missing
+  Each step MUST complete correctly before the next can function. Missing
   timesheet IDs in the Team sheet block rate sync and report population.
+
+  On the project card the user starts team update with the Update team button.
+
+  Entry: the project card in the same dashboard tab. The card opens on a
+  project-name click on the dashboard (FR-PROJECT-001) or after successful
+  project creation (FR-PROJECT-002). Not a new browser window.
+
+  Exit: the same project card. Tables block contents are FR-SHEET-001: the three
+  project spreadsheets are on the card; timesheet links appear, stay unchanged,
+  or are extended according to the Update team result; an empty Team does not
+  create timesheet links and does not remove links already shown. The card does
+  not close. While Update team is in progress the user MUST NOT leave the card.
+
 priority: must
+
+depends_on:
+  - FR-PROJECT-001
 
 acceptance_criteria:
   - "After sync creates timesheets for new specialists, timesheet IDs are written back to the Team sheet Timesheet column for every newly created specialist, regardless of how many pre-existing timesheet holders are already present."
@@ -18,6 +34,14 @@ acceptance_criteria:
   - "Sync correctly processes supported locale-specific numeric rate formats. If a new rate is empty or invalid, sync preserves the previous rates and calculations, writes an ERROR log, then continues processing other valid rows."
   - "The sync pipeline does not skip the ID write-back step when the number of newly created timesheets differs from the pre-existing count."
   - "Running sync with no specialist changes produces zero net modifications to the Team sheet, report spreadsheets, or calculation spreadsheets."
+  - "The project card shows an Update team button."
+  - "A Back to project list button is at the top left. A click returns to the dashboard list in the same tab, not a new window."
+  - "The project card opens in the same dashboard tab, not a new browser window."
+  - "While Update team is in progress the status is \"Updating team...\". Update team, Update rates, Close period, and Back to project list are disabled. The user MUST NOT leave to the list until Update team finishes. A repeated Update team click does not send a second request."
+  - "On a successful sync response the card shows \"Timesheets created: N.\" where N is specialists_created from the sync response, including 0. The card does not close. Command buttons and Back to project list are enabled again. Per-row Team errors are not shown on the card."
+  - "After a successful Update team the Tables block on the card follows FR-SHEET-001: Project info / Team, General Expenses, and Payment Distribution links are present; Specialist timesheets links exist only when timesheets exist. Success MUST NOT hide links that were already shown. An empty Team does not add timesheet links."
+  - "A failed sync request and a network timeout show the same text on the card: \"Failed to update the team. Try again later.\" The card does not close. This failure does not add new table links, including timesheet links. An already visible Tables block stays as it was. Command buttons and Back to project list are enabled again."
+  - "Visual style of the card and the primary button MUST match docs/ui-style.md and the snapshots in docs/ui-style/: cards as cards.png, header as header.png. MUST NOT copy marketing landing copy or the chat widget."
 
 implements:
   - src/feptm/api/v1/projects.py::sync_project_specialists
@@ -31,3 +55,5 @@ revision_history:
   - "v1 (2026-08-08, commit TBD): initial spec — captured uncovered sync lifecycle gap. Timesheet IDs were not written back to Team sheet when all specialists were new (update_timesheet_ids gated on existing_count instead of newly created count). Rate sync had no auto-timesheet creation path."
   - "v2 (2026-08-08, WF-1 fix): fix update_timesheet_ids guard — compute new_count from specialists without timesheets instead of reusing existing_count from list_from_sheet. Add auto-timesheet creation to sync_project_rates so rate sync is self-sufficient when run before initial sync."
   - "v3 (2026-08-14, commit TBD): empty or invalid new rate values no longer default to 0; sync preserves the previous rates and calculations, writes an ERROR log, and continues processing other valid rows."
+  - "v4 (2026-09-01): dashboard Update team; status Updating team...; Back locked until sync ends; success copy Timesheets created: N; tables block present after success (new, unchanged, or extended); failed sync does not add new table links; depends_on FR-PROJECT-001 only."
+  - "v5 (2026-09-01): Tables block per FR-SHEET-001 — three project sheets always; timesheet links only when timesheets exist; empty Team adds no timesheet links and does not remove shown links; failed sync adds no new table or timesheet links."

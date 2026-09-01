@@ -1,0 +1,36 @@
+id: FR-SHEET-001
+title: Open project Google Sheets from the project card
+description: |
+  The user opens project Google Sheets from the project card.
+
+  Entry: the project card in the same dashboard tab (project-name click,
+  FR-PROJECT-001, or after successful creation, FR-PROJECT-002).
+
+  A click on a link opens Google Sheets in a new tab. The dashboard card is
+  not replaced and does not close.
+
+  The Tables block on the card always contains Project info / Team, General
+  Expenses, and Payment Distribution (files exist from project creation,
+  FR-TEMPLATE-001). Specialist timesheets links are one per specialist who
+  has a timesheet; the label is the timesheet file name in the Google Drive
+  folder. While there are no timesheets, those links are absent.
+
+  Exit on link click: a new Sheets tab. Back to project list is FR-SYNC-001.
+
+priority: must
+
+depends_on:
+  - FR-SYNC-001
+
+acceptance_criteria:
+  - "The project card Tables block shows Project info / Team, General Expenses, and Payment Distribution links even when Team has no specialists."
+  - "Specialist timesheets: one link per specialist who has a timesheet. The link label is the timesheet file name in the Drive folder. Links are sorted alphabetically by that name, case-insensitive."
+  - "Successful Update team with no specialists in Team: the three project-sheet links stay. No new Specialist timesheets links are added."
+  - "First successful Update team with specialists in Team: Specialist timesheets links appear for timesheets just created. The three project-sheet links stay."
+  - "Repeat successful Update team with no new specialists in Team: the link set is unchanged. Nothing is removed or added."
+  - "Repeat successful Update team after a specialist is added to Team: existing links stay; a link is added for the new specialist timesheet (Drive file name)."
+  - "Successful Update team after all specialists are removed from Team: already shown links, including timesheets, stay. No new links are added."
+  - "Update team failure and network timeout: no new links. Already shown links are not deleted and not hidden."
+  - "A click on any shown link opens the matching Google spreadsheet in a new tab. The dashboard card stays in the previous tab."
+  - "No link without a URL. Every shown link opens an existing spreadsheet of this project."
+  - "Visual style MUST match docs/ui-style.md: secondary controls as the outline on buttons.png or chips on cards.png. MUST NOT copy marketing landing copy or the chat widget."
