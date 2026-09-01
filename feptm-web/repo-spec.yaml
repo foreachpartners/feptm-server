@@ -1,0 +1,7 @@
+name: web
+role: webapp
+requirements:
+  - FR-PROJECT-001
+  - FR-PROJECT-002
+ports:
+  http: 3000
