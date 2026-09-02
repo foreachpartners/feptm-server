@@ -102,6 +102,14 @@ class ProjectStorageProtocol(Protocol):
         """Check if a tab with period_name already exists (period already closed)."""
         ...
 
+    def delete_sheet(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+    ) -> bool:
+        """Delete a sheet tab from a spreadsheet. Returns True if deleted, False if not found."""
+        ...
+
 
 class SpecialistStorageProtocol(Protocol):
     """Protocol for specialist-scoped spreadsheet operations."""

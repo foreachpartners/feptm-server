@@ -322,6 +322,34 @@ class TestProjectStorage:
         period_values = period_call[0].kwargs["values"]
         assert period_values == [["Aug 2026"], ["Aug 2026"], [""]]
 
+    def test_delete_sheet_deletes_existing_tab(self, project_storage, mock_sheets):
+        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [
+                {"properties": {"title": "Current period", "sheetId": 1}},
+                {"properties": {"title": "Aug 2026", "sheetId": 2}},
+            ],
+        }
+
+        result = project_storage.delete_sheet("spreadsheet-id", "Aug 2026")
+
+        assert result is True
+        mock_sheets.batch_update.assert_called_once_with(
+            spreadsheet_id="spreadsheet-id",
+            requests=[{"deleteSheet": {"sheetId": 2}}],
+        )
+
+    def test_delete_sheet_returns_false_when_tab_not_found(self, project_storage, mock_sheets):
+        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [
+                {"properties": {"title": "Current period", "sheetId": 1}},
+            ],
+        }
+
+        result = project_storage.delete_sheet("spreadsheet-id", "Aug 2026")
+
+        assert result is False
+        mock_sheets.batch_update.assert_not_called()
+
     def test_is_period_closed_returns_true_when_tab_exists(self, project_storage):
         project_storage._list_sheet_titles = MagicMock(
             return_value=["Current period", "Aug 2026"]
@@ -705,8 +733,9 @@ class TestProjectServiceFacade:
         project_service._projects.close_period_in_timesheet = MagicMock(
             return_value=0
         )
-        project_service._projects.archive_current_period = MagicMock()
+        project_service._projects.archive_current_period = MagicMock(return_value=True)
         project_service._projects.protect_archived_sheet = MagicMock()
+        project_service._projects.delete_sheet = MagicMock(return_value=True)
         project_service._projects.remove_stale_specialists = MagicMock(
             return_value=0
         )
@@ -718,13 +747,48 @@ class TestProjectServiceFacade:
 
         assert result.entries_updated == 0
         assert result.specialists_processed == 1
-        assert result.report_archived is True  # Archive is called FIRST, before timesheet updates
+        assert result.report_archived is False
         assert result.calculations_archived is False
         project_service._projects.archive_current_period.assert_called_once()
-        project_service._projects.protect_archived_sheet.assert_not_called()  # Not protected because total_entries == 0
-        project_service._projects.remove_stale_specialists.assert_called_once_with(
-            "report-id", {"John"}
+        project_service._projects.delete_sheet.assert_called_once_with("report-id", "Q2")
+        project_service._projects.protect_archived_sheet.assert_not_called()
+        project_service._projects.remove_stale_specialists.assert_not_called()
+
+    def test_close_period_no_entries_deletes_both_archived_tabs(self, project_service):
+        from feptm.models.project import Project
+        from feptm.models.specialist import Specialist
+
+        project = Project(
+            name="Test",
+            drive_folder_id="folder-id",
+            report_spreadsheet_id="report-id",
+            calculations_spreadsheet_id="calc-id",
         )
+        project_service._projects.get_project_metadata = MagicMock(
+            return_value=project
+        )
+        sp = Specialist(
+            name="John", role="Dev", timesheet="ts-1", row_index=2,
+        )
+        project_service._specialists.list_from_sheet = MagicMock(
+            return_value=([sp], 1)
+        )
+        project_service._projects.close_period_in_timesheet = MagicMock(return_value=0)
+        project_service._projects.archive_current_period = MagicMock(return_value=True)
+        project_service._projects.delete_sheet = MagicMock(return_value=True)
+        project_service._projects.protect_archived_sheet = MagicMock()
+        project_service._projects.remove_stale_specialists = MagicMock(return_value=0)
+
+        result = project_service.close_period("test-id", "Q3")
+
+        assert result.entries_updated == 0
+        assert result.report_archived is False
+        assert result.calculations_archived is False
+        assert project_service._projects.delete_sheet.call_count == 2
+        project_service._projects.delete_sheet.assert_any_call("report-id", "Q3")
+        project_service._projects.delete_sheet.assert_any_call("calc-id", "Q3")
+        project_service._projects.protect_archived_sheet.assert_not_called()
+        project_service._projects.remove_stale_specialists.assert_not_called()
 
     def test_close_period_no_timesheet_specialists(self, project_service):
         from feptm.models.project import Project

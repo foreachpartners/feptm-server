@@ -312,8 +312,15 @@ class TimesheetProjectService:
                 specialists_processed += 1
                 total_entries += updated
 
-        # Step 3: Protect archived sheets if entries were updated
-        if total_entries > 0:
+        # Step 3: If no entries were updated, delete the archived tabs
+        if total_entries == 0:
+            if report_archived and project.report_spreadsheet_id:
+                self._projects.delete_sheet(project.report_spreadsheet_id, period_name)
+                report_archived = False
+            if calculations_archived and project.calculations_spreadsheet_id:
+                self._projects.delete_sheet(project.calculations_spreadsheet_id, period_name)
+                calculations_archived = False
+        else:
             if report_archived and project.report_spreadsheet_id:
                 self._projects.protect_archived_sheet(
                     project.report_spreadsheet_id,
@@ -326,16 +333,16 @@ class TimesheetProjectService:
                     period_name,
                     payment_status_col_idx=5,
                 )
-        if project.report_spreadsheet_id:
-            removed = self._projects.remove_stale_specialists(
-                project.report_spreadsheet_id, active_names
-            )
-            log.info("Removed %d stale specialists from report Current Period", removed)
-        if project.calculations_spreadsheet_id:
-            removed = self._projects.remove_stale_specialists(
-                project.calculations_spreadsheet_id, active_names
-            )
-            log.info("Removed %d stale specialists from calculations Current Period", removed)
+            if project.report_spreadsheet_id:
+                removed = self._projects.remove_stale_specialists(
+                    project.report_spreadsheet_id, active_names
+                )
+                log.info("Removed %d stale specialists from report Current Period", removed)
+            if project.calculations_spreadsheet_id:
+                removed = self._projects.remove_stale_specialists(
+                    project.calculations_spreadsheet_id, active_names
+                )
+                log.info("Removed %d stale specialists from calculations Current Period", removed)
 
         log.info(
             "Closed period %s: %d entries updated, %d specialists processed",
