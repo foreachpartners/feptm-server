@@ -1,0 +1,39 @@
+id: FR-OPEN-001
+title: Open a project card by ID from a dedicated URL
+description: |
+  The user opens the project-ID entry URL in the browser. There is no sign-in.
+
+  A text field is in the center. To the left of the field is the text
+  "Enter project ID". Below the field is the Confirm button.
+
+  Entry: the project-ID entry URL in the browser. Success: that project's card
+  in the same tab, not a new window. Failure: the user stays on the ID entry
+  page; the error text is on that page. There is no Cancel.
+
+  While the field is empty or whitespace-only, Confirm is disabled and no
+  request is sent. Before the request the system trims leading and trailing
+  whitespace. While the server handles the request the status is
+  "Opening...", the field and Confirm are disabled, and a repeated Confirm
+  or Enter does not send a second request. After failure the field and
+  Confirm are enabled again. Error text clears on a new edit and on a new
+  Confirm. After success the ID entry page is replaced by the project card.
+
+priority: must
+
+depends_on:
+  - FR-PROJECT-001
+
+acceptance_criteria:
+  - "Opening the project-ID entry URL shows the entry page immediately: no sign-in form, no login field, no password field."
+  - "On open, focus is in the project ID field."
+  - "The page has a centered input field; the text \"Enter project ID\" to the left of the field; and a Confirm button below the field."
+  - "While the field is empty or whitespace-only, Confirm is disabled and no request is sent. Enter in the field in this state does not send a request."
+  - "Enter in the field while Confirm is enabled performs the same action as a Confirm click."
+  - "Before the request is sent the system trims leading and trailing whitespace. The request uses the trimmed ID."
+  - "While the request is in progress the status is \"Opening...\". The project ID field and Confirm are disabled. A repeated Confirm click and Enter do not send a second request."
+  - "Error text on the entry page clears as soon as the user changes the field text, and at a new Confirm (click or Enter), before the server response."
+  - "A 404 response (no project with that ID) keeps the user on the ID entry page. The text is \"Project not found.\" The field and Confirm are enabled again."
+  - "A 5xx response, any other server failure, and a network timeout keep the user on the ID entry page. The text is \"Failed to open the project. Try again later.\" The field and Confirm are enabled again."
+  - "On a successful response the project card for the trimmed ID from the request opens in the same tab, not a new window. The ID entry page is no longer visible."
+  - "The project card is the same card as after a project-name click on the projects dashboard (FR-PROJECT-001)."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Confirm is the primary button as on buttons.png / header.png. MUST NOT copy marketing landing copy or the chat widget."

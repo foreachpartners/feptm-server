@@ -20,7 +20,7 @@ description: |
   On the project card the user starts closure with the Close period button.
 
   Entry: the project card in the same dashboard tab (project-name click,
-  FR-PROJECT-001, or after successful project creation, FR-PROJECT-002).
+  FR-PROJECT-001, or after successful project creation, FR-CREATE-001).
   Close period opens a modal over the project card.
 
   Cancel before success: the modal closes, the period is not closed, the

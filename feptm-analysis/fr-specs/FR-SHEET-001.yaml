@@ -4,7 +4,7 @@ description: |
   The user opens project Google Sheets from the project card.
 
   Entry: the project card in the same dashboard tab (project-name click,
-  FR-PROJECT-001, or after successful creation, FR-PROJECT-002).
+  FR-PROJECT-001, or after successful creation, FR-CREATE-001).
 
   A click on a link opens Google Sheets in a new tab. The dashboard card is
   not replaced and does not close.

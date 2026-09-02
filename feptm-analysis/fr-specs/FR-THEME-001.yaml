@@ -1,0 +1,41 @@
+id: FR-THEME-001
+title: Toggle the panel dark and light theme with one button
+description: |
+  The user switches the theme of the whole panel on the projects dashboard
+  and on the project card. The button is at the top right.
+
+  Entry: the projects dashboard (FR-PROJECT-001) or the project card
+  (project-name click, FR-PROJECT-001; after project creation, FR-CREATE-001).
+
+  First display of the projects dashboard, the project card, the create-project
+  overlay, and the Close period modal is the dark theme. A click on the button
+  on the projects dashboard or on the project card applies the light theme to
+  the projects dashboard and the project card. A second click restores the dark
+  theme on the projects dashboard and the project card.
+
+  There is no theme button on the create-project overlay or in the Close period
+  modal. The create-project overlay and the Close period modal inherit the
+  current theme.
+
+  Cancel and command errors do not change the theme. The backend is not
+  involved.
+
+priority: must
+
+depends_on:
+  - FR-PROJECT-001
+
+acceptance_criteria:
+  - "First display of the projects dashboard, the project card, the create-project overlay, and the Close period modal is the dark theme. The OS system theme does not affect first display."
+  - "On the projects dashboard the theme button is at the top right."
+  - "On the project card the theme button is at the top right."
+  - "The create-project overlay and the Close period modal have no separate theme button."
+  - "The button is an outline control: a moon on the light theme (docs/ui-style/header-light.png) and a sun on the dark theme. MUST NOT copy landing-page labels (Start project, nav items)."
+  - "While the theme is dark, one click on the button on the projects dashboard or on the project card applies the light theme to the projects dashboard and the project card. The create-project overlay and the Close period modal inherit the light theme."
+  - "While the theme is light, one click on the button on the projects dashboard or on the project card applies the dark theme to the projects dashboard and the project card. The create-project overlay and the Close period modal inherit the dark theme."
+  - "Navigating between the projects dashboard and the project card in the same tab does not reset the chosen theme."
+  - "A full reload of the dashboard URL shows the dark theme again."
+  - "While the create-project overlay or the Close period modal is open, a click on the dimmed projects dashboard or project card does not switch the theme. The theme button under the create-project overlay and under the modal is not available."
+  - "The dark theme MUST match docs/ui-style.md and the snapshots header.png, buttons.png, cards.png, heading.png, footer.png."
+  - "The light theme MUST match docs/ui-style.md and the snapshots header-light.png, buttons-light.png, cards-light.png, heading-light.png, footer-light.png."
+  - "MUST NOT invent a third palette. MUST NOT copy marketing landing copy or the chat widget."

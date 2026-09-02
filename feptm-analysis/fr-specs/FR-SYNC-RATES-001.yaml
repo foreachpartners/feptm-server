@@ -13,7 +13,7 @@ description: |
 
   Entry: the project card in the same dashboard tab (project-name click on the
   dashboard, FR-PROJECT-001, or after successful project creation,
-  FR-PROJECT-002). Not a new browser window.
+  FR-CREATE-001). Not a new browser window.
 
   Exit: the same project card. After Update rates the card shows a short
   result: success "Rates updated: N." or failure "Failed to update rates.

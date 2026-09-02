@@ -6,7 +6,7 @@ description: |
 
   Entry: the dashboard URL in the browser. Exit on project-name click: that
   project's card in the same tab. Exit on Create project: the create form
-  (FR-PROJECT-002) as an overlay on the list.
+  (FR-CREATE-001) as an overlay on the list.
 
   The dashboard shows project names from a single list request to the server.
   An empty list response is not a request failure.
