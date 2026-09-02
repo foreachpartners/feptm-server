@@ -155,3 +155,61 @@ def test_sync_project_rates_service_error(
         "/api/projects/sync-rates", json={"project_id": "test-id"}
     )
     assert response.status_code == 500
+
+
+@patch("feptm.api.v1.projects.settings")
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_list_projects_success(mock_get_service, mock_settings, client: TestClient):
+    mock_service = MagicMock()
+    mock_service.list_projects.return_value = [
+        {"name": "Alpha", "id": "folder-a"},
+        {"name": "Beta", "id": "folder-b"},
+    ]
+    mock_get_service.return_value = mock_service
+    mock_settings.GOOGLE_PROJECTS_FOLDER_ID = "parent-folder"
+
+    response = client.get("/api/projects")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["projects"]) == 2
+    assert data["projects"][0]["name"] == "Alpha"
+    assert data["projects"][0]["drive_folder_id"] == "folder-a"
+    assert data["projects"][1]["name"] == "Beta"
+
+
+@patch("feptm.api.v1.projects.settings")
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_list_projects_empty(mock_get_service, mock_settings, client: TestClient):
+    mock_service = MagicMock()
+    mock_service.list_projects.return_value = []
+    mock_get_service.return_value = mock_service
+    mock_settings.GOOGLE_PROJECTS_FOLDER_ID = "parent-folder"
+
+    response = client.get("/api/projects")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["projects"] == []
+
+
+@patch("feptm.api.v1.projects.settings")
+def test_list_projects_missing_config(mock_settings, client: TestClient):
+    mock_settings.GOOGLE_PROJECTS_FOLDER_ID = None
+
+    response = client.get("/api/projects")
+
+    assert response.status_code == 500
+
+
+@patch("feptm.api.v1.projects.settings")
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_list_projects_service_error(mock_get_service, mock_settings, client: TestClient):
+    mock_service = MagicMock()
+    mock_service.list_projects.side_effect = Exception("Drive failure")
+    mock_get_service.return_value = mock_service
+    mock_settings.GOOGLE_PROJECTS_FOLDER_ID = "parent-folder"
+
+    response = client.get("/api/projects")
+
+    assert response.status_code == 500

@@ -31,6 +31,15 @@ class Project(BaseModel):
     })
 
 
+class ProjectListItem(BaseModel):
+    name: str
+    drive_folder_id: str
+
+
+class ProjectListResponse(BaseModel):
+    projects: list[ProjectListItem]
+
+
 class ProjectMetaResponse(BaseModel):
     """Response model for project metadata creation."""
 

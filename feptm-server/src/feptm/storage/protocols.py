@@ -19,6 +19,10 @@ class ProjectStorageProtocol(Protocol):
         """Create a project with folder and spreadsheets from templates."""
         ...
 
+    def list_projects(self, parent_folder_id: str) -> list[dict[str, str]]:
+        """List project folders from Google Drive."""
+        ...
+
     def update_project_info_sheet(self, spreadsheet_id: str, project: Project) -> None:
         """Write project metadata to the Project Info sheet."""
         ...

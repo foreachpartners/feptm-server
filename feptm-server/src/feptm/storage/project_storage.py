@@ -91,6 +91,9 @@ class ProjectStorage:
                     log.error("Failed to clean up: %s", cleanup_error)
             raise
 
+    def list_projects(self, parent_folder_id: str) -> list[dict[str, str]]:
+        return self._sheets.list_drive_folders(parent_folder_id)
+
     def update_project_info_sheet(self, spreadsheet_id: str, project: Project) -> None:
         project_data: list[list[Any]] = [
             ["Project Information", ""],

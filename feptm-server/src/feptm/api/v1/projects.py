@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from feptm.core.config import settings
 from feptm.dependencies import get_timesheet_project_service
 from feptm.models import (
+    ProjectListItem,
+    ProjectListResponse,
     ProjectMetaResponse,
     ProjectSyncRatesRequest,
     ProjectSyncRatesResponse,
@@ -23,6 +25,33 @@ class ProjectCreateRequest(BaseModel):
     project_name: str = Field(
         ..., min_length=1, description="Project name cannot be empty"
     )
+
+
+# @req FR-PROJECT-001
+@router.get("/", response_model=ProjectListResponse)
+async def list_projects() -> ProjectListResponse:
+    try:
+        if not settings.GOOGLE_PROJECTS_FOLDER_ID:
+            raise HTTPException(
+                status_code=500,
+                detail="GOOGLE_PROJECTS_FOLDER_ID not configured.",
+            )
+
+        service: TimesheetProjectService = get_timesheet_project_service()
+        folders = service.list_projects(settings.GOOGLE_PROJECTS_FOLDER_ID)
+
+        return ProjectListResponse(
+            projects=[
+                ProjectListItem(name=f["name"], drive_folder_id=f["id"])
+                for f in folders
+            ]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load the project list: {e}"
+        )
 
 
 @router.post("/create", response_model=ProjectMetaResponse)

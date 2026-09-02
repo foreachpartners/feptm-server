@@ -80,6 +80,10 @@ class TimesheetProjectService:
         )
         return result  # AR-ARCH-001:allow — facade return type preserved for API compat
 
+    def list_projects(self, parent_folder_id: str) -> list[dict[str, str]]:
+        result = self._projects.list_projects(parent_folder_id)
+        return sorted(result, key=lambda x: x["name"].lower())
+
     def sync_project_specialists(
         self, project_id: str
     ) -> tuple[list[Specialist], int, int]:
