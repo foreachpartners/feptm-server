@@ -17,7 +17,22 @@ description: |
   Payment Status cells remain available to the Project Manager for recording
   payment after the period is closed.
 
+  On the project card the user starts closure with the Close period button.
+
+  Entry: the project card in the same dashboard tab (project-name click,
+  FR-PROJECT-001, or after successful project creation, FR-CREATE-001).
+  Close period opens a modal over the project card.
+
+  Cancel before success: the modal closes, the period is not closed, the
+  project card is unchanged for the period. Cancel after success: the modal
+  closes, the period stays closed, the project card is visible. Cancel does
+  not undo closure. On error: the user stays in the modal on the project
+  card, error text is on the form, the period is not closed.
+
 priority: must
+
+depends_on:
+  - FR-PROJECT-001
 
 acceptance_criteria:
   - "The system accepts project_id and a non-empty period_name without start_date and end_date."
@@ -33,6 +48,19 @@ acceptance_criteria:
   - "Changes to source hours or rates after closure do not change archived values."
   - "In archived tabs and specialist timesheets, the system creates strict Protected Ranges for all cells except Payment Status cells defined by the templates; only the document owner can edit protected cells."
   - "After closure, entries with a non-empty Payment Period are no longer included in Current Period; Current Period includes only entries with an empty Payment Period."
+  - "The project card shows a Close period button in the same row as Update team and Update rates."
+  - "A Back to project list button is at the top left. A click returns to the dashboard list in the same tab, not a new window."
+  - "The project card opens in the same dashboard tab, not a new window."
+  - "Close period opens a modal over the project card, not a new page and not a new tab."
+  - "While the modal is open, a click on the dimmed project card does not close the period, does not open spreadsheets, and does not navigate to the list. The project card under the modal is not clickable."
+  - "The modal has a Period name field; the text \"Important! All unclosed hours, rates, and dates will be fixed. After that they can be changed only by hand.\"; Confirm (primary) and Cancel (secondary) buttons."
+  - "While Period name is empty or whitespace-only, Confirm is disabled and no close request is sent."
+  - "Cancel before successful closure closes the modal. The period is not closed. The project card is unchanged for the period."
+  - "While closure is in progress the status is \"Closing period...\". The modal cannot be closed. Confirm, Cancel, Update team, Update rates, Close period, and Back to project list are disabled. A repeated Confirm click does not send a second request."
+  - "On a successful close response the modal stays open and shows \"Period closed: {period_name}.\" where period_name is from the response. Confirm is disabled and no second close request is sent. Cancel is enabled: it closes the modal, the project card is visible, the period stays closed. Cancel does not undo closure. The project card under the modal is not clickable."
+  - "A failed request and a network timeout keep the modal open; the form shows \"Failed to close the period. Try again later.\" The period is not closed. Confirm and Cancel are enabled again. The project card under the modal is not clickable."
+  - "A 409 response (a period with that name is already closed) keeps the modal open; the form shows \"This period is already closed.\" The period is not closed again. Confirm and Cancel are enabled again. The project card under the modal is not clickable."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Confirm is the primary button as on buttons.png / header.png. Cancel is the secondary outline button as on buttons.png / footer.png. Closure risk is the warning text in the modal, not a third palette from the landing page. MUST NOT copy marketing landing copy or the chat widget."
 
 implements:
   - src/feptm/api/v1/periods.py::close_payment_period
@@ -45,3 +73,4 @@ revision_history:
   - "v1 (2026-08-11, commit TBD): when closing a payment period, the system records period_name in the Period column of the archived General Expenses and Payment Distribution tabs."
   - "v2 (2026-08-14, commit TBD): payment period closure uses project_id and period_name without start_date and end_date, includes every entry with an empty Payment Period from project specialists' timesheets, and does not use Date for entry selection."
   - "v3 (2026-08-19, commit TBD): if an archived tab named period_name already exists, closure does not write period_name to the Payment Period column in timesheets and does not modify Current Period; a newly created archived tab is placed at the end of the tab list."
+  - "v4 (2026-09-01): dashboard Close period; modal; two Cancel meanings; success copy on the modal; Confirm disabled after success; 409 already closed; ui-style; depends_on FR-PROJECT-001."
