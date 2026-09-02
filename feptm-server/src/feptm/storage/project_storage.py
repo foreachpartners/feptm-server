@@ -626,6 +626,35 @@ class ProjectStorage:
         existing = self._list_sheet_titles(spreadsheet_id)
         return period_name in existing
 
+    def delete_sheet(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+    ) -> bool:
+        if not self._sheets.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+
+        spreadsheet = (
+            self._sheets.sheets_service.spreadsheets()
+            .get(spreadsheetId=spreadsheet_id)
+            .execute()
+        )
+        sheet_id = None
+        for sheet in spreadsheet.get("sheets", []):
+            if sheet.get("properties", {}).get("title") == sheet_name:
+                sheet_id = sheet.get("properties", {}).get("sheetId")
+                break
+
+        if sheet_id is None:
+            return False
+
+        self._sheets.batch_update(
+            spreadsheet_id=spreadsheet_id,
+            requests=[{"deleteSheet": {"sheetId": sheet_id}}],
+        )
+        log.info("Deleted sheet %s from spreadsheet %s", sheet_name, spreadsheet_id)
+        return True
+
     def remove_stale_specialists(
         self,
         spreadsheet_id: str,
