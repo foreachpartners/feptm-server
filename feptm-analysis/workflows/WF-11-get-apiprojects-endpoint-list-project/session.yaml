@@ -1,0 +1,15 @@
+created: '2026-09-02'
+description: Add GET /api/projects endpoint to list project folders from Google Drive
+  for the dashboard
+fr_ids:
+- FR-PROJECT-001
+repos:
+- feptm-server
+ceremony: minimal
+status: done
+baseline_policy: ignore
+sessions:
+  init: SID-1788359770-3527ae56
+  plan: SID-1788360321-bef0a555
+  implement: SID-1788360725-90f9dad0
+  finalize: SID-1788363057-e69a06a2
