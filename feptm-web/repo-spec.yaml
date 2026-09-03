@@ -2,6 +2,12 @@ name: web
 role: webapp
 requirements:
   - FR-PROJECT-001
-  - FR-PROJECT-002
+  - FR-CREATE-001
+  - FR-OPEN-001
+  - FR-SHEET-001
+  - FR-SYNC-001
+  - FR-SYNC-RATES-001
+  - FR-PAYMENT-001
+  - FR-THEME-001
 ports:
   http: 3000

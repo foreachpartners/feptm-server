@@ -8,10 +8,14 @@ export const metadata: Metadata = {
   description: "FEPTM projects dashboard",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({
+                                     children,
+                                   }: Readonly<{
+  children: ReactNode;
+}>) {
   return (
-    <html lang="ru">
+      <html lang="en">
       <body>{children}</body>
-    </html>
+      </html>
   );
 }

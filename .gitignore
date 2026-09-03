@@ -184,3 +184,30 @@ pyrightconfig.json
 .env.local
 .env.*.local
 .env
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build outputs
+.next/
+out/
+dist/
+.vercel
+
+# TypeScript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Environment variables (web)
+.env.local
+.env.*.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ESLint cache
+.eslintcache
