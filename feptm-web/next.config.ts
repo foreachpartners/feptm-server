@@ -1,21 +1,31 @@
-import type { NextConfig } from "next";
+import path from 'node:path';
+import type { NextConfig } from 'next';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+const DEFAULT_API_ORIGIN = 'http://localhost:8000';
 
-if (!apiUrl) {
-  throw new Error(
-      "NEXT_PUBLIC_API_URL must be configured before starting Next.js."
+function resolveApiOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  console.warn(
+    `[feptm-web] NEXT_PUBLIC_API_URL is not set; using ${DEFAULT_API_ORIGIN}. Copy env.example to .env.local to override.`,
   );
+  return DEFAULT_API_ORIGIN;
 }
+
+const apiOrigin = resolveApiOrigin();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: path.resolve(process.cwd()),
 
   async rewrites() {
     return [
       {
-        source: "/api/:path*",
-        destination: `${apiUrl.replace(/\/$/, "")}/api/:path*`,
+        source: '/api/:path*',
+        destination: `${apiOrigin}/api/:path*`,
       },
     ];
   },

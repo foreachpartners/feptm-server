@@ -3,7 +3,6 @@ role: webapp
 requirements:
   - FR-PROJECT-001
   - FR-CREATE-001
-  - FR-OPEN-001
   - FR-SHEET-001
   - FR-SYNC-001
   - FR-SYNC-RATES-001

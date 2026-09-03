@@ -1,21 +1,21 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 
-import "./globals.css";
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "FEPTM",
-  description: "FEPTM projects dashboard",
+  title: 'FEPTM',
+  description: 'FEPTM projects dashboard',
 };
 
 export default function RootLayout({
-                                     children,
-                                   }: Readonly<{
+  children,
+}: Readonly<{
   children: ReactNode;
 }>) {
   return (
-      <html lang="en">
+    <html lang="en">
       <body>{children}</body>
-      </html>
+    </html>
   );
 }

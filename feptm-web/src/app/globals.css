@@ -6,7 +6,9 @@
   --surface: #0d2429;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
