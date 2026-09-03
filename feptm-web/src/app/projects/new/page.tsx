@@ -1,4 +1,3 @@
-// @req FR-CREATE-001
 export default function CreateProjectPage() {
   return (
     <main>

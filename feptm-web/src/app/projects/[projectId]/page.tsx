@@ -1,4 +1,3 @@
-// @req FR-DETAIL-001
 export default function ProjectPage() {
   return (
     <main>
