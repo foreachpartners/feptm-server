@@ -1,0 +1,81 @@
+id: "AR-LINT-001"
+title: "Linting and Formatting Toolchain"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "Use ESLint flat config format (eslint.config.mts or eslint.config.js)."
+  - "Extend chain: @eslint/js recommended → typescript-eslint recommended → react recommended → eslint-config-prettier."
+  - "Formatting: 2-space indentation, semicolons required, single quotes, trailing commas (all)."
+  - "Prettier config: semi: true, singleQuote: true, tabWidth: 2, trailingComma: \"all\"."
+  - "Enforce curly: all (mandatory braces on all blocks)."
+  - "Enforce id-length: min 2 (exceptions: i, e, x, y for loop counters and callbacks)."
+  - "Enforce no-restricted-syntax to ban React.FC and FC type annotations — use direct props typing on function components."
+  - "Provide lint and format scripts in package.json."
+  - "Include eslint-plugin-react-hooks with rules-of-hooks (error) and exhaustive-deps (warn)."
+
+prohibitions:
+  - "Legacy .eslintrc.* config files — use flat config only."
+  - "console.log — forbidden everywhere. Other console methods (console.warn, console.error, console.info, console.debug) are allowed."
+  - "Prettier config conflicts with ESLint (use eslint-config-prettier to resolve)."
+  - "React.FC, React.FunctionComponent, FC type annotations — use direct props typing on function declarations."
+
+checks:
+  eslint-flat-config:
+    type: file_exists
+    severity: error
+    aspect: lint
+    description: "ESLint flat config file must exist"
+    required:
+      - eslint.config.mts
+
+  no-legacy-eslint:
+    type: file_exists
+    severity: error
+    aspect: lint
+    description: "Legacy ESLint config files must not exist"
+    absent:
+      - .eslintrc.js
+      - .eslintrc.cjs
+      - .eslintrc.json
+      - .eslintrc.yaml
+      - .eslintrc.yml
+
+  prettier-config:
+    type: file_exists
+    severity: error
+    aspect: lint
+    description: "Prettier config must exist"
+    required:
+      - .prettierrc.json
+
+  prettier-config-fields:
+    type: regex
+    severity: warn
+    aspect: lint
+    description: ".prettierrc.json field values must match AR-LINT-001 requirements"
+    files: ".prettierrc.json"
+    positive:
+      - pattern: '"semi"\s*:\s*true'
+        message: ".prettierrc.json must set \"semi\": true"
+      - pattern: '"singleQuote"\s*:\s*true'
+        message: ".prettierrc.json must set \"singleQuote\": true"
+      - pattern: '"tabWidth"\s*:\s*2'
+        message: ".prettierrc.json must set \"tabWidth\": 2"
+      - pattern: '"trailingComma"\s*:\s*"all"'
+        message: ".prettierrc.json must set \"trailingComma\": \"all\""
+
+  package-lint-scripts:
+    type: regex
+    severity: warn
+    aspect: lint
+    description: "package.json must have lint and format scripts"
+    files: "package.json"
+    positive:
+      - pattern: '"lint"'
+        message: "package.json missing lint script"
+      - pattern: '"format"'
+        message: "package.json missing format script"
+
+enforcement: []

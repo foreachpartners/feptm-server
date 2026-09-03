@@ -1,0 +1,22 @@
+id: "AR-NEXTJS-001"
+title: "Next.js Framework Conventions"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "MUST use the App Router (app/ directory); do not introduce a pages/ tree alongside it."
+  - "MUST mark interactive components with 'use client' at the top; default to server components for static rendering."
+  - "MUST proxy browser backend calls through next.config.js rewrites. The rewrite destination MUST come from NEXT_PUBLIC_API_URL rather than a hardcoded host."
+  - "MUST read runtime config from environment variables (NEXT_PUBLIC_* for client; plain names for server)."
+  - "MUST set explicit page Metadata (title, description) in layout.tsx or per-page metadata exports."
+  - "SHOULD prefer Server Components for data that does not change between requests; use Client Components only for interactivity."
+  - "MUST configure reactStrictMode: true in next.config.js."
+
+prohibitions:
+  - "MUST NOT mix App Router and Pages Router in the same app."
+  - "MUST NOT hard-code backend URLs in component code; always go through /api/* rewrites or env-driven config."
+  - "MUST NOT call fetch with no error handling — wrap in try/catch and surface a UI status."
+  - "MUST NOT use getServerSideProps, getStaticProps, or _app.tsx (legacy Pages Router APIs)."
+
+enforcement: []

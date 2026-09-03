@@ -1,0 +1,81 @@
+id: "AR-HTML-001"
+title: "Semantic, Accessible, Responsive Document Structure"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "Page structure MUST follow: <body> → <header> → <main> → <footer>. No content outside this structure."
+  - "Use semantic HTML5 elements: <nav>, <article>, <section>, <aside>, <figure>, <figcaption>, <time>, <address>."
+  - "Every page MUST have exactly one <main> element."
+  - "Every <img> MUST have a meaningful alt attribute (empty alt=\"\" only for decorative images)."
+  - "Headings MUST follow hierarchy: one <h1> per page, no skipping levels (h1 → h2 → h3)."
+  - "Use <button> for actions and <a> for navigation — never <div onClick>."
+  - "Required meta tags in layout: title, description, viewport, charset, og:title, og:description, og:image, og:type, og:url."
+  - "Use Next.js metadata export or generateMetadata for meta tag management."
+  - "Forms MUST use <label> elements associated with inputs via htmlFor."
+  - "Lists of items MUST use <ul>/<ol>/<li> — not sequences of <div>."
+  - "Modal overlays MUST use <dialog> semantics or portal-based implementation with proper focus management and background scroll locking."
+  - "Every icon-only control MUST have an accessible name."
+  - "Dynamic loading, validation, success, and failure messages MUST be exposed to assistive technology through an appropriate ARIA live region or status role."
+  - "The interface MUST remain usable from 320 CSS pixels through desktop widths without horizontal page scrolling."
+
+prohibitions:
+  - "<div> with click handlers acting as buttons or links — use <button> or <a>."
+  - "Skipping heading levels (e.g. <h1> followed by <h3>)."
+  - "<img> without alt attribute."
+  - "Non-semantic layout with only <div> and <span> — use semantic elements."
+  - "Meta tags via raw <meta> in JSX — use Next.js metadata API."
+  - "Allow keyboard focus or pointer interaction to reach content behind an open modal."
+
+task_patterns:
+  - keywords: [page, layout, meta, seo]
+    files: ["app/**/*.tsx", "src/app/**/*.tsx"]
+  - keywords: [component, html, semantic]
+    files: ["app/components/**/*.tsx", "src/components/**/*.tsx"]
+
+checks:
+  layout-has-metadata:
+    type: regex
+    severity: error
+    aspect: html
+    description: "Root layout must export metadata or generateMetadata"
+    files: "src/app/layout.tsx"
+    positive:
+      - pattern: 'export\s+(const\s+metadata|async\s+function\s+generateMetadata|function\s+generateMetadata)'
+        message: "Root layout missing metadata export — add metadata or generateMetadata"
+
+  no-div-onclick:
+    type: regex
+    severity: warn
+    aspect: html
+    description: "No div/span with onClick acting as interactive elements"
+    files: "src/**/*.tsx"
+    exclude_lines:
+      - 'role="button"'
+      - 'role="link"'
+    negative:
+      - pattern: '<div[^>]*onClick'
+        message: "div with onClick detected — use <button> for actions or <a> for navigation"
+
+  img-has-alt:
+    type: regex
+    severity: warn
+    aspect: html
+    description: "All img elements must have alt attribute"
+    files: "src/**/*.tsx"
+    negative:
+      - pattern: '<img(?![^>]*\balt\b)[^>]*>'
+        message: "img without alt attribute — add meaningful alt text or alt='' for decorative images"
+
+  page-has-main:
+    type: regex
+    severity: warn
+    aspect: html
+    description: "Layout should contain main element for page structure"
+    files: "src/app/**/layout.tsx"
+    positive:
+      - pattern: '<main'
+        message: "Layout missing <main> element — page structure must be header > main > footer"
+
+enforcement: []

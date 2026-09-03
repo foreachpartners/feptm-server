@@ -1,0 +1,18 @@
+id: AR-TYPESCRIPT-001
+title: TypeScript safety conventions
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "MUST enable `strict: true` and `noUncheckedIndexedAccess: true` in tsconfig."
+  - "MUST declare explicit return types on every exported function."
+  - "MUST use `interface` for object shapes that may be extended, `type` for unions and aliases."
+  - "MUST narrow `unknown` and error types via `instanceof` checks before accessing fields."
+  - "SHOULD prefer `readonly` arrays and properties when the value is not mutated after construction."
+
+prohibitions:
+  - "MUST NOT use `any` outside test code or third-party shim files."
+  - "MUST NOT use `// @ts-ignore` or `// @ts-expect-error` without an inline comment explaining why."
+  - "MUST NOT cast with `as` to bypass type errors; fix the type or narrow the value instead."
+  - "MUST NOT export enums for cross-cutting domain types when a literal-string union conveys the same meaning."

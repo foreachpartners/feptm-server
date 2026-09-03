@@ -1,0 +1,101 @@
+id: "AR-REACT-001"
+title: "React Feature and Component Architecture"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "Minimum React version: 18.0.0. Target: 19.x for new projects."
+  - "Use automatic JSX transform (no import React from 'react')."
+  - "Type component props directly on function parameters — DO NOT use React.FC, FC, or React.FunctionComponent."
+  - "Enable reactStrictMode: true in Next.js apps."
+  - "State management:"
+  - "  - Zustand for client-side UI state (theme, modal visibility, loading flags)."
+  - "  - TanStack React Query for server/API state with retry: 0 (fail fast, no automatic retries for user-triggered actions)."
+  - "Use next-intl for i18n if multi-language support is required (currently English only)."
+  - "Use eslint-plugin-react-hooks: rules-of-hooks (error) and exhaustive-deps (warn). Hooks MUST only be called at the top level — never inside conditions, loops, or after early returns."
+  - "Named exports for components — export function Button(), not export default. Simplifies refactoring, auto-imports, and codebase search."
+  - "One public component per file. Small private helper components within the same file are allowed."
+  - "Naming conventions: components PascalCase, hooks useCamelCase, handlers handleAction (props onAction), utilities camelCase, constants UPPER_SNAKE_CASE."
+  - "File naming: components PascalCase.tsx (e.g. ProjectCard.tsx), hooks useCamelCase.ts (e.g. useProjectSync.ts), utilities camelCase.ts (e.g. formatDate.ts). Directories: kebab-case."
+  - "useEffect cleanup: subscriptions, timers, and AbortController MUST return a cleanup function."
+  - "React 19+: DO NOT use forwardRef — ref is a regular prop. For React 18 projects, forwardRef is still acceptable."
+  - "Prefer early return over nested ternaries for conditional rendering."
+  - "Use src/app for route composition, src/components for reusable presentation components, and src/features for self-contained business features."
+  - "Feature modules MAY import shared code from src/components and src/lib but MUST NOT import another feature's internals."
+  - "Keep reusable typed async-action state handling in a shared hook or feature utility rather than duplicating state-machine logic across features."
+  - "Component size: SHOULD stay under 300 lines. Above 300 lines — consider decomposition."
+
+prohibitions:
+  - "Class components — use function components with hooks. Only exception: Error Boundary components (getDerivedStateFromError / componentDidCatch have no hook equivalent)."
+  - "import React from 'react' — automatic JSX transform handles this."
+  - "Direct DOM manipulation (document.getElementById, innerHTML) — use refs."
+  - "Inline styles when Tailwind utility classes are available."
+  - "React.FC, FC, React.FunctionComponent — type props directly on function parameters."
+  - "Array index as key in dynamic lists (key={index}) — use stable unique identifiers."
+  - "Blind props spreading ({...props}) without explicit TypeScript typing of accepted props."
+  - "export default for components — use named exports."
+  - "Nested ternaries for conditional rendering (a ? b : c ? d : e) — use early returns or extract to variables."
+  - "Place business logic directly in src/app; use route composition there and keep feature logic in src/features."
+  - "Create circular dependencies between feature modules."
+
+task_patterns:
+  - keywords: [component, hook, state]
+    files: ["src/**/*.tsx", "src/**/*.ts"]
+
+checks:
+  no-react-import:
+    type: regex
+    severity: warn
+    aspect: react
+    description: "No manual React import for JSX (automatic transform)"
+    files: "src/**/*.tsx"
+    negative:
+      - pattern: "import React from ['\"]react['\"]"
+        message: "Remove 'import React from react'; automatic JSX transform is enabled"
+
+  no-class-components:
+    type: regex
+    severity: warn
+    aspect: react
+    description: "No class components (except Error Boundary)"
+    files: "src/**/*.tsx"
+    exclude_lines:
+      - 'getDerivedStateFromError|componentDidCatch'
+    negative:
+      - pattern: 'class \w+ extends (React\.)?Component'
+        message: "Class component detected; use function component with hooks (exception: Error Boundary only)"
+
+  no-react-fc:
+    type: regex
+    severity: warn
+    aspect: react
+    description: "No React.FC or FC type annotations"
+    files: "src/**/*.tsx"
+    negative:
+      - pattern: ':\s*(React\.)?(FC|FunctionComponent)\b'
+        message: "Do not use React.FC/FC/FunctionComponent; type props directly on function parameters"
+
+  no-index-key:
+    type: regex
+    severity: warn
+    aspect: react
+    description: "No array index as key in dynamic lists"
+    files: "src/**/*.tsx"
+    negative:
+      - pattern: 'key=\{(index|idx|i)\}'
+        message: "Do not use array index as key; use a stable unique identifier"
+
+  no-default-export:
+    type: regex
+    severity: warn
+    aspect: react
+    description: "No default exports for components"
+    files: "src/**/*.tsx"
+    exclude_files:
+      - "src/app/**/*"
+    negative:
+      - pattern: 'export default'
+        message: "Use named exports instead of export default"
+
+enforcement: []

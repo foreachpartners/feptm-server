@@ -1,0 +1,16 @@
+id: "AR-WEBARCH-001"
+title: "Dashboard Visual Token System"
+scope: [webapp]
+always_apply: false
+context: "Theme behaviour remains in FR-THEME-001; this AR constrains only visual-token implementation."
+
+requirements:
+  - "Implement the visual system in feptm-analysis/docs/ui-style.md and its snapshots through a single token layer."
+  - "Define colours, typography, spacing, radii, and shadows as CSS custom properties in one shared theme stylesheet."
+  - "Components MUST consume visual tokens rather than introduce local palette, typography, or button-style values."
+
+prohibitions:
+  - "Introduce a second color palette, typography system, or button style."
+  - "Copy marketing landing-page content or a live-site chat widget into the dashboard."
+
+enforcement: []

@@ -1,0 +1,22 @@
+id: "AR-API-001"
+title: "Typed API Client Architecture"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "MUST centralize all backend HTTP calls in a single module at src/lib/api/client.ts (or equivalent)."
+  - "MUST mirror the OpenAPI schemas (request/response shapes) as TypeScript types in the API client."
+  - "MUST throw a typed error class (e.g., ApiClientError) on non-2xx responses, carrying status + error code."
+  - "MUST set Accept: application/json on every request and Content-Type: application/json on requests with bodies."
+  - "MUST expose distinct typed failures for network failure, structured API error, and unexpected non-JSON response so feature code can render the applicable FR state."
+  - "SHOULD keep the API client pure — no React imports, no DOM access — so it can be tested in isolation."
+  - "SHOULD use fetch with appropriate caching options (for client-side calls, no caching)."
+
+prohibitions:
+  - "MUST NOT call fetch directly from React components; route every call through the API client module."
+  - "MUST NOT swallow errors with catch {} or .catch(() => {}) — handle or rethrow."
+  - "MUST NOT depend on absolute backend URLs in client code; always use the same-origin path proxied via Next.js rewrites (see AR-NEXTJS-001)."
+  - "MUST NOT return any or untyped JSON from API client functions."
+
+enforcement: []

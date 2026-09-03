@@ -1,0 +1,77 @@
+id: "AR-FALLBACK-001"
+title: "API Failure and Content Integrity"
+scope: [webapp]
+always_apply: false
+context: ""
+
+requirements:
+  - "Frontend MUST NOT inject demo, mock, or placeholder content into API responses. What API returns is what gets rendered."
+  - "SPA context (this project): unreadable or missing fields in API responses MUST be mapped to type-appropriate empty defaults in mappers (lib/mappers/):"
+  - "  - empty string for text"
+  - "  - empty array for lists"
+  - "  - 0 for numbers"
+  - "  - null for optional references"
+  - "  - These defaults prevent mapper failures; they MUST NOT replace an API-level failure with fabricated content."
+  - "API-level errors (network failure, 5xx) MUST result in error states in UI (error messages, empty states with user feedback). Never silent data substitution."
+  - "Graceful empty states (empty arrays, zero counts) are acceptable as initial values for loading states — these represent absence of data, not fake data."
+  - "Static UI assets (logos, icons, CTA backgrounds) MUST be stored in theme config (YAML) or public/ directory — never hardcoded as CDN URLs in component code."
+
+prohibitions:
+  - "Demo, mock, or placeholder data files anywhere in the codebase: src/lib/fallbacks/, src/mocks/, src/content/, src/fixtures/."
+  - "FALLBACKS_ENABLED toggle or NEXT_PUBLIC_DISABLE_FALLBACKS environment variable."
+  - "Hardcoded content that mimics API responses (fake catalog entries, fake purchases, hero slides)."
+  - "Hardcoded CDN URLs in component code — static assets go in theme config or public/."
+  - "Components rendering content data that did not originate from API (static UI labels, icons, and navigation are not content data)."
+
+task_patterns:
+  - keywords: [fallback, mock, error, catch, default, empty state]
+    files: ["src/lib/**/*.ts", "src/lib/services/**/*.ts", "src/app/**/*.tsx"]
+
+checks:
+  no-fallbacks-directory:
+    type: file_exists
+    severity: error
+    aspect: architecture
+    description: "Fallbacks directory with demo data must not exist"
+    absent:
+      - src/lib/fallbacks
+
+  no-mocks-directory:
+    type: file_exists
+    severity: error
+    aspect: architecture
+    description: "Mocks directory must not exist"
+    absent:
+      - src/mocks
+
+  no-fallbacks-enabled-flag:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "FALLBACKS_ENABLED toggle must not exist — no demo data switching"
+    files: "src/**/*.{ts,tsx}"
+    negative:
+      - pattern: "FALLBACKS_ENABLED"
+        message: "FALLBACKS_ENABLED toggle detected — remove per AR-FALLBACK-001"
+
+  no-disable-fallbacks-env:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "NEXT_PUBLIC_DISABLE_FALLBACKS env var must not exist"
+    files: "src/**/*.{ts,tsx}"
+    negative:
+      - pattern: "NEXT_PUBLIC_DISABLE_FALLBACKS"
+        message: "NEXT_PUBLIC_DISABLE_FALLBACKS env var detected — remove per AR-FALLBACK-001"
+
+  no-demo-tag:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "No @demo tagged content"
+    files: "src/**/*.{ts,tsx}"
+    negative:
+      - pattern: "@demo"
+        message: "Demo-tagged content detected — remove per AR-FALLBACK-001"
+
+enforcement: []
