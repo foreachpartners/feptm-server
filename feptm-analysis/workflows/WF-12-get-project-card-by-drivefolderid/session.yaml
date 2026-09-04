@@ -1,0 +1,15 @@
+created: '2026-09-04'
+description: GET project card by drive_folder_id
+fr_ids:
+- FR-PROJECT-001
+- FR-CREATE-001
+- FR-SHEET-001
+repos:
+- feptm-server
+ceremony: medium
+status: done
+sessions:
+  init: SID-1788546092-a7fa0be3
+  plan: SID-1788546260-059029d6
+  implement: SID-1788546599-bdcc8a29
+  finalize: SID-1788547132-2734e48f

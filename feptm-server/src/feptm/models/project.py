@@ -84,3 +84,23 @@ class ProjectSyncRatesResponse(BaseModel):
     project_id: str
     specialists_updated: int
     specialists: list[Specialist]
+
+
+class ProjectCardTable(BaseModel):
+    label: str
+    spreadsheet_id: str
+    url: str
+
+
+class ProjectCardTimesheet(BaseModel):
+    name: str
+    spreadsheet_id: str
+    url: str
+
+
+class ProjectCardResponse(BaseModel):
+    name: str
+    drive_folder_id: str
+    project_id: str
+    tables: dict[str, ProjectCardTable]
+    timesheets: list[ProjectCardTimesheet]

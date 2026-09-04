@@ -23,6 +23,10 @@ class ProjectStorageProtocol(Protocol):
         """List project folders from Google Drive."""
         ...
 
+    def get_project_card(self, folder_id: str) -> dict:
+        """Get project card data by Drive folder ID."""
+        ...
+
     def update_project_info_sheet(self, spreadsheet_id: str, project: Project) -> None:
         """Write project metadata to the Project Info sheet."""
         ...

@@ -213,3 +213,164 @@ def test_list_projects_service_error(mock_get_service, mock_settings, client: Te
     response = client.get("/api/projects")
 
     assert response.status_code == 500
+
+
+MOCK_CARD_DATA = {
+    "name": "Acme",
+    "drive_folder_id": "folder-1",
+    "project_id": "info-id",
+    "info_spreadsheet_id": "info-id",
+    "report_spreadsheet_id": "report-id",
+    "calculations_spreadsheet_id": "calc-id",
+    "timesheets": [],
+}
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_success_no_timesheets(
+    mock_get_service, client: TestClient
+):
+    mock_service = MagicMock()
+    mock_service.get_project_card.return_value = MOCK_CARD_DATA
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/folder-1/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Acme"
+    assert data["drive_folder_id"] == "folder-1"
+    assert data["project_id"] == "info-id"
+    assert data["timesheets"] == []
+    assert data["tables"]["project_info"]["spreadsheet_id"] == "info-id"
+    assert data["tables"]["project_info"]["url"] == (
+        "https://docs.google.com/spreadsheets/d/info-id"
+    )
+    assert data["tables"]["general_expenses"]["spreadsheet_id"] == "report-id"
+    assert data["tables"]["payment_distribution"]["spreadsheet_id"] == "calc-id"
+    assert data["tables"]["project_info"]["label"] == "Project info / Team"
+    assert data["tables"]["general_expenses"]["label"] == "General Expenses"
+    assert data["tables"]["payment_distribution"]["label"] == "Payment Distribution"
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_timesheets_sorted_case_insensitive(
+    mock_get_service, client: TestClient
+):
+    card_data = {
+        **MOCK_CARD_DATA,
+        "timesheets": [
+            {"name": "Time Tracking for alice. Project Acme", "id": "ts-alice"},
+            {"name": "Time Tracking for Bob. Project Acme", "id": "ts-bob"},
+        ],
+    }
+    mock_service = MagicMock()
+    mock_service.get_project_card.return_value = card_data
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/folder-1/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["timesheets"]) == 2
+    assert data["timesheets"][0]["name"] == "Time Tracking for alice. Project Acme"
+    assert data["timesheets"][1]["name"] == "Time Tracking for Bob. Project Acme"
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_timesheet_not_in_team(
+    mock_get_service, client: TestClient
+):
+    card_data = {
+        **MOCK_CARD_DATA,
+        "timesheets": [
+            {"name": "Time Tracking for Ghost. Project Acme", "id": "ts-ghost"},
+        ],
+    }
+    mock_service = MagicMock()
+    mock_service.get_project_card.return_value = card_data
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/folder-1/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["timesheets"]) == 1
+    assert data["timesheets"][0]["name"] == "Time Tracking for Ghost. Project Acme"
+    assert data["timesheets"][0]["spreadsheet_id"] == "ts-ghost"
+    assert data["timesheets"][0]["url"] == (
+        "https://docs.google.com/spreadsheets/d/ts-ghost"
+    )
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_folder_not_found(
+    mock_get_service, client: TestClient
+):
+    from feptm.core.exceptions import ProjectFolderNotFoundError
+
+    mock_service = MagicMock()
+    mock_service.get_project_card.side_effect = ProjectFolderNotFoundError(
+        "bad-folder"
+    )
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/bad-folder/")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project folder not found."
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_missing_spreadsheet(
+    mock_get_service, client: TestClient
+):
+    from feptm.core.exceptions import ProjectSpreadsheetNotFoundError
+
+    mock_service = MagicMock()
+    mock_service.get_project_card.side_effect = ProjectSpreadsheetNotFoundError(
+        "Acme - General Expenses"
+    )
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/folder-1/")
+
+    assert response.status_code == 404
+    assert "Acme - General Expenses" in response.json()["detail"]
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_no_side_effects(
+    mock_get_service, client: TestClient
+):
+    mock_service = MagicMock()
+    mock_service.get_project_card.return_value = MOCK_CARD_DATA
+    mock_get_service.return_value = mock_service
+
+    client.get("/api/projects/folder-1/")
+
+    mock_service.create_project.assert_not_called()
+    mock_service.sync_project_specialists.assert_not_called()
+    mock_service.sync_project_rates.assert_not_called()
+    mock_service.close_period.assert_not_called()
+
+
+@patch("feptm.api.v1.projects.get_timesheet_project_service")
+def test_get_project_card_project_id_matches_sync(
+    mock_get_service, client: TestClient
+):
+    card_data = {
+        **MOCK_CARD_DATA,
+        "project_id": "sync-target-id",
+        "info_spreadsheet_id": "sync-target-id",
+    }
+    mock_service = MagicMock()
+    mock_service.get_project_card.return_value = card_data
+    mock_get_service.return_value = mock_service
+
+    response = client.get("/api/projects/folder-1/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["project_id"] == "sync-target-id"
+    assert data["project_id"] == data["tables"]["project_info"]["spreadsheet_id"]

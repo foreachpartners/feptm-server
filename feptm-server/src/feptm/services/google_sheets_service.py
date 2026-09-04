@@ -423,6 +423,38 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to list folders in {parent_folder_id}: {error}")
 
+    def list_drive_spreadsheets(
+        self, folder_id: str
+    ) -> list[dict[str, str]]:
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
+        spreadsheets: list[dict[str, str]] = []
+        page_token: str | None = None
+
+        try:
+            while True:
+                query = (
+                    f"'{folder_id}' in parents and "
+                    "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+                )
+                request = self.drive_service.files().list(
+                    q=query,
+                    fields="nextPageToken, files(id,name)",
+                    pageToken=page_token,
+                )
+                result = request.execute()
+                for f in result.get("files", []):
+                    spreadsheets.append({"id": f["id"], "name": f["name"]})
+                page_token = result.get("nextPageToken")
+                if not page_token:
+                    break
+            return spreadsheets
+        except HttpError as error:
+            raise Exception(
+                f"Failed to list spreadsheets in {folder_id}: {error}"
+            )
+
     def delete_file(self, file_id: str) -> None:
         """Delete a file from Google Drive.
 

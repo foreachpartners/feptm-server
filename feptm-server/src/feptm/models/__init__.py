@@ -3,6 +3,9 @@
 from feptm.models.payment_period import ClosePeriodRequest, ClosePeriodResponse
 from feptm.models.project import (
     Project,
+    ProjectCardResponse,
+    ProjectCardTable,
+    ProjectCardTimesheet,
     ProjectListItem,
     ProjectListResponse,
     ProjectMetaResponse,
@@ -17,6 +20,9 @@ __all__ = [
     "ClosePeriodRequest",
     "ClosePeriodResponse",
     "Project",
+    "ProjectCardResponse",
+    "ProjectCardTable",
+    "ProjectCardTimesheet",
     "ProjectListItem",
     "ProjectListResponse",
     "ProjectMetaResponse",

@@ -84,6 +84,9 @@ class TimesheetProjectService:
         result = self._projects.list_projects(parent_folder_id)
         return sorted(result, key=lambda x: x["name"].lower())
 
+    def get_project_card(self, folder_id: str) -> dict:
+        return self._projects.get_project_card(folder_id)
+
     def sync_project_specialists(
         self, project_id: str
     ) -> tuple[list[Specialist], int, int]:

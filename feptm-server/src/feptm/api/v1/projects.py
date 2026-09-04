@@ -6,8 +6,15 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from feptm.core.config import settings
+from feptm.core.exceptions import (
+    ProjectFolderNotFoundError,
+    ProjectSpreadsheetNotFoundError,
+)
 from feptm.dependencies import get_timesheet_project_service
 from feptm.models import (
+    ProjectCardResponse,
+    ProjectCardTable,
+    ProjectCardTimesheet,
     ProjectListItem,
     ProjectListResponse,
     ProjectMetaResponse,
@@ -16,6 +23,7 @@ from feptm.models import (
     ProjectSyncRequest,
     ProjectSyncResponse,
 )
+from feptm.timesheets.config_service import UrlPattern
 from feptm.timesheets.project_service import TimesheetProjectService
 
 router = APIRouter()
@@ -172,4 +180,68 @@ async def sync_project_rates(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to sync specialist rates: {e}"
+        )
+
+
+# @req FR-PROJECT-001, FR-CREATE-001, FR-SHEET-001
+@router.get("/{drive_folder_id}/", response_model=ProjectCardResponse)
+async def get_project_card(drive_folder_id: str) -> ProjectCardResponse:
+    try:
+        service: TimesheetProjectService = get_timesheet_project_service()
+        card_data = service.get_project_card(drive_folder_id)
+
+        tables = {
+            "project_info": ProjectCardTable(
+                label="Project info / Team",
+                spreadsheet_id=card_data["info_spreadsheet_id"],
+                url=UrlPattern.SPREADSHEET.format(
+                    spreadsheet_id=card_data["info_spreadsheet_id"]
+                ),
+            ),
+            "general_expenses": ProjectCardTable(
+                label="General Expenses",
+                spreadsheet_id=card_data["report_spreadsheet_id"],
+                url=UrlPattern.SPREADSHEET.format(
+                    spreadsheet_id=card_data["report_spreadsheet_id"]
+                ),
+            ),
+            "payment_distribution": ProjectCardTable(
+                label="Payment Distribution",
+                spreadsheet_id=card_data["calculations_spreadsheet_id"],
+                url=UrlPattern.SPREADSHEET.format(
+                    spreadsheet_id=card_data["calculations_spreadsheet_id"]
+                ),
+            ),
+        }
+
+        timesheets = [
+            ProjectCardTimesheet(
+                name=ts["name"],
+                spreadsheet_id=ts["id"],
+                url=UrlPattern.SPREADSHEET.format(spreadsheet_id=ts["id"]),
+            )
+            for ts in card_data["timesheets"]
+        ]
+
+        return ProjectCardResponse(
+            name=card_data["name"],
+            drive_folder_id=card_data["drive_folder_id"],
+            project_id=card_data["project_id"],
+            tables=tables,
+            timesheets=timesheets,
+        )
+    except ProjectFolderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail="Project folder not found."
+        )
+    except ProjectSpreadsheetNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project spreadsheet not found: {e.expected_name}.",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load project card: {e}"
         )

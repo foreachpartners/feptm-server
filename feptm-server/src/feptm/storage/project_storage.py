@@ -5,6 +5,10 @@ from decimal import Decimal
 from typing import Any
 
 from feptm.core import utils
+from feptm.core.exceptions import (
+    ProjectFolderNotFoundError,
+    ProjectSpreadsheetNotFoundError,
+)
 from feptm.core.log import log
 from feptm.models.project import Project
 from feptm.models.specialist import Specialist
@@ -93,6 +97,51 @@ class ProjectStorage:
 
     def list_projects(self, parent_folder_id: str) -> list[dict[str, str]]:
         return self._sheets.list_drive_folders(parent_folder_id)
+
+    def get_project_card(self, folder_id: str) -> dict:
+        try:
+            folder = self._sheets.get_file(folder_id)
+        except Exception as e:
+            raise ProjectFolderNotFoundError(folder_id) from e
+
+        mime = folder.get("mimeType", "")
+        if "folder" not in mime:
+            raise ProjectFolderNotFoundError(folder_id)
+
+        folder_name: str = folder.get("name", "")
+        spreadsheets = self._sheets.list_drive_spreadsheets(folder_id)
+
+        expected_keys = {
+            "info": f"{folder_name} - Project info",
+            "report": f"{folder_name} - General Expenses",
+            "calculations": f"{folder_name} - Payment Distribution",
+        }
+
+        found: dict[str, str] = {}
+        for key, expected_name in expected_keys.items():
+            match = next(
+                (s for s in spreadsheets if s["name"] == expected_name),
+                None,
+            )
+            if match is None:
+                raise ProjectSpreadsheetNotFoundError(expected_name)
+            found[key] = match["id"]
+
+        three_names = set(expected_keys.values())
+        timesheets = sorted(
+            [s for s in spreadsheets if s["name"] not in three_names],
+            key=lambda x: x["name"].lower(),
+        )
+
+        return {
+            "name": folder_name,
+            "drive_folder_id": folder_id,
+            "project_id": found["info"],
+            "info_spreadsheet_id": found["info"],
+            "report_spreadsheet_id": found["report"],
+            "calculations_spreadsheet_id": found["calculations"],
+            "timesheets": timesheets,
+        }
 
     def update_project_info_sheet(self, spreadsheet_id: str, project: Project) -> None:
         project_data: list[list[Any]] = [
