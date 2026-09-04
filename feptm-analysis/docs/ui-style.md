@@ -16,13 +16,17 @@ No input-field screenshot exists. Derive fields, modals, errors, and disabled bu
 
 The header-light snapshot includes the site theme-toggle control (moon icon, outline button). Use that control shape for the panel theme switch. MUST NOT copy the landing CTA label.
 
-Logo: company-owned; reuse the mark from the header snapshot or the live site.
+Logo: company-owned file `docs/ui-style/foreach-partners-logo.png`. Copy it to `feptm-web/public/foreach-partners-logo.png`. Use as an `<img>` in the header. MUST NOT download `/shaking-hands.svg`, crop `header.png`, or redraw the mark.
 
 ## Dark snapshots
 
 ### Header
 
 ![Header](ui-style/header.png)
+
+### Header logo file
+
+![Header logo](ui-style/foreach-partners-logo.png)
 
 ### Primary and secondary buttons
 

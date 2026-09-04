@@ -1,0 +1,15 @@
+created: '2026-09-04'
+description: Show the project list on the shared dashboard URL per FR-PROJECT-001
+fr_ids:
+- FR-PROJECT-001
+repos:
+- web
+- feptm-server
+ceremony: medium
+status: done
+baseline_policy: fix_err
+sessions:
+  init: "32f3a8f1-bc28-43fc-a3e7-a538f86b2ed8"
+  plan: "86f3ab5b-fe11-479f-aa1b-648dfe4ccb03"
+  implement: "b6acde73-49bf-4a9a-bc75-4c09a6c9c9a2"
+  finalize: "32f95fbb-9569-48d5-a615-5f3c972b1a61"

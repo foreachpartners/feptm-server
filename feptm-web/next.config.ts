@@ -20,9 +20,18 @@ const apiOrigin = resolveApiOrigin();
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.resolve(process.cwd()),
+  skipTrailingSlashRedirect: true,
 
   async rewrites() {
     return [
+      {
+        source: '/api/projects',
+        destination: `${apiOrigin}/api/projects/`,
+      },
+      {
+        source: '/api/projects/',
+        destination: `${apiOrigin}/api/projects/`,
+      },
       {
         source: '/api/:path*',
         destination: `${apiOrigin}/api/:path*`,

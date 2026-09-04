@@ -1,3 +1,12 @@
+export interface ProjectListItem {
+  name: string;
+  drive_folder_id: string;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectListItem[];
+}
+
 export interface ProjectMeta {
   created: string;
   modified: string;

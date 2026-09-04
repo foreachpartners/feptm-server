@@ -1,6 +1,7 @@
 name: feptm-server
 role: service
 requirements:
+  - FR-PROJECT-001
   - FR-PAYMENT-001
   - FR-SPECIALIST-001
   - FR-SYNC-001
