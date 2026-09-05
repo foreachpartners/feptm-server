@@ -10,8 +10,10 @@ description: |
   an overlay on the list. After a successful create the new project's card
   opens in a new browser tab. The dashboard list stays in the previous tab.
 
-  The dashboard shows project names from a single list request to the server.
-  An empty list response is not a request failure.
+  The dashboard shows project names from a single list request to the server
+  as a vertical list of full-width rows. That list uses the same layout as
+  the Tables links on the project card. An empty list response is not a
+  request failure.
 
 priority: must
 
@@ -20,13 +22,15 @@ acceptance_criteria:
   - "Opening the dashboard URL shows the dashboard heading \"FEP Projects Dashboard\", the \"Create project\" button, and the project-name list."
   - "The dashboard displays the project names returned by a single server list request."
   - "List rows are sorted alphabetically by project name, case-insensitive."
+  - "Project names MUST be a single-column vertical list of full-width rows. Each row MUST match a Tables link on the project card: surface fill, thin border, rounded corners, left-aligned name. MUST NOT lay out project names as a multi-column card grid."
   - "While the list is loading, a loading state is visible and the \"Create project\" button stays enabled."
   - "An empty server list response shows the text \"no projects\" and the \"Create project\" button."
   - "A failed list request shows the text \"Failed to load the project list. Refresh the page or try again later.\" The \"Create project\" button stays visible and enabled."
   - "A click on a project name opens that project's card in a new browser tab, not a new window. The dashboard list stays in the previous tab."
   - "A click on \"Create project\" opens the create form as an overlay on the list."
   - "After a successful project create the created project's card opens in a new browser tab, not a new window. The dashboard list stays in the previous tab."
-  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, ForEach Partners header logo, primary button as on buttons.png / header.png, list as cards.png / heading.png. MUST NOT copy marketing landing copy or the chat widget."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, ForEach Partners header logo, primary button as on buttons.png / header.png, heading as heading.png. List-row chrome (fill, border, radius) MAY use cards.png tokens. List layout MUST follow the Tables list on the project card, not the multi-column grid on cards.png. MUST NOT copy marketing landing copy or the chat widget."
 
 revision_history:
   - "v1 (2026-09-05): project-name click and successful create open the card in a new browser tab; the dashboard list stays in the previous tab."
+  - "v2 (2026-09-05): dashboard project names are a single-column vertical list of full-width rows matching the Tables links on the project card, not a multi-column card grid."

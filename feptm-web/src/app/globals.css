@@ -174,8 +174,7 @@ html[data-theme="light"] {
 
 .project-name-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  gap: var(--space-lg);
+  gap: var(--space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -189,7 +188,7 @@ html[data-theme="light"] {
 
 .project-name-list__link {
   display: block;
-  padding: var(--space-xl) var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
   color: var(--foreground);
   text-decoration: none;
   font-weight: 600;

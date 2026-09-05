@@ -1,0 +1,15 @@
+created: '2026-09-05'
+description: Dashboard project names as a single-column vertical list of full-width
+  rows matching the Tables links on the project card, not a multi-column card grid.
+fr_ids:
+- FR-PROJECT-001
+repos:
+- web
+ceremony: minimal
+status: done
+baseline_policy: fix_err
+sessions:
+  init: "1eaa9338-58a5-45ee-8371-c7a09a4d3690"
+  plan: "f5089b7a-c44b-4138-9468-4c5c2b830736"
+  implement: "9eaff1fb-e115-4681-a5c4-bc6ea433213a"
+  finalize: "dac7dea0-730b-43c7-839a-cdcc9e50d931"
