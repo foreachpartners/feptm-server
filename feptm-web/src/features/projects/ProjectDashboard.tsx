@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactElement } from 'react';
+
 import { AppHeader } from '@/components/AppHeader';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { CreateProjectOverlay } from '@/features/projects/CreateProjectOverlay';
@@ -8,14 +10,16 @@ import { useProjectDashboardStore } from '@/features/projects/projectDashboardSt
 import { PROJECT_LIST_LOAD_ERROR } from '@/lib/api/projects';
 import { useProjectList } from '@/features/projects/useProjectList';
 
-export function ProjectDashboard() {
+export function ProjectDashboard(): ReactElement {
   const { data, isError, isPending } = useProjectList();
   const openCreateOverlay = useProjectDashboardStore((state) => state.openCreateOverlay);
+  const isCreateOverlayOpen = useProjectDashboardStore((state) => state.isCreateOverlayOpen);
+  const chromeInert = isCreateOverlayOpen || undefined;
 
   return (
     <>
-      <AppHeader />
-      <main className="dashboard">
+      <AppHeader inert={chromeInert} />
+      <main className="dashboard" inert={chromeInert}>
         <div className="dashboard__toolbar">
           <h1 className="dashboard__heading">FEP Projects Dashboard</h1>
           <PrimaryButton onClick={openCreateOverlay}>Create project</PrimaryButton>
@@ -27,7 +31,7 @@ export function ProjectDashboard() {
         ) : null}
         {data && data.projects.length > 0 ? <ProjectNameList projects={data.projects} /> : null}
       </main>
-      <footer className="app-footer">
+      <footer className="app-footer" inert={chromeInert}>
         <p className="app-footer__inner">© 2026 ForEach Partners</p>
       </footer>
       <CreateProjectOverlay />

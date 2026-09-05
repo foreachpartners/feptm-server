@@ -1,6 +1,14 @@
-export function AppHeader() {
+import type { ReactElement } from 'react';
+
+import { ThemeToggle } from '@/components/ThemeToggle';
+
+interface AppHeaderProps {
+  inert?: boolean;
+}
+
+export function AppHeader({ inert }: AppHeaderProps): ReactElement {
   return (
-    <header className="app-header">
+    <header className="app-header" inert={inert || undefined}>
       <div className="app-header__brand">
         <img
           src="/foreach-partners-logo.png"
@@ -11,6 +19,7 @@ export function AppHeader() {
         />
         <span className="app-header__wordmark">ForEach Partners</span>
       </div>
+      <ThemeToggle />
     </header>
   );
 }

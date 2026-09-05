@@ -117,7 +117,7 @@ export function ProjectCard(): ReactElement {
 
   return (
     <>
-      <AppHeader />
+      <AppHeader inert={isCloseOpen || undefined} />
       <main className="project-card" inert={isCloseOpen || undefined}>
         {isCommandBusy ? (
           <button className="project-card__back" disabled type="button">
@@ -161,7 +161,7 @@ export function ProjectCard(): ReactElement {
           <ProjectCardTables tables={cardQuery.data.tables} timesheets={cardQuery.data.timesheets} />
         ) : null}
       </main>
-      <footer className="app-footer">
+      <footer className="app-footer" inert={isCloseOpen || undefined}>
         <p className="app-footer__inner">© 2026 ForEach Partners</p>
       </footer>
       {isCloseOpen ? (

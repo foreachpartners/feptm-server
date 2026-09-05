@@ -1,0 +1,16 @@
+created: '2026-09-05'
+description: Toggle the panel dark and light theme with one button on the projects
+  dashboard and the project card. First display is dark; overlay and Close period
+  modal inherit the current theme; backend is not involved.
+fr_ids:
+- FR-THEME-001
+repos:
+- web
+ceremony: minimal
+status: done
+baseline_policy: fix_err
+sessions:
+  init: "7c27133f-f0ad-4fec-9c75-ab90547ec076"
+  plan: "0d4319ba-dead-4906-ad0b-e12b337c55e4"
+  implement: "fc3c627e-7498-49bc-a6d3-6359e53b71d6"
+  finalize: "15eb2bc4-93e9-4b61-b0db-004bb0d35238"

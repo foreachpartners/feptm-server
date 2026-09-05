@@ -1,0 +1,11 @@
+# WF-15: Tasks
+
+| # | Task | Req | Depends on | Status | Completed |
+|---|------|-----|------------|--------|-----------|
+| T-01 | Tokens: in `feptm-web/src/app/globals.css` keep `:root` dark; add `html[data-theme="light"]` overrides for `--background`, `--foreground`, `--muted`, `--accent`, `--on-accent`, `--surface`, `--border`, `--error`, `--overlay`, `--grid` sampled from `feptm-analysis/docs/ui-style.md` + `header-light.png`, `buttons-light.png`, `cards-light.png`, `heading-light.png`, `footer-light.png` and live light CSS. Set `color-scheme` per theme. No `@media (prefers-color-scheme)`. Add `.theme-toggle` outline icon button. Place brand left / toggle right on `.app-header`. | FR-THEME-001 | — | done | 2026-09-05T20:26 |
+| T-02 | Store: add `feptm-web/src/features/theme/themeStore.ts` — Zustand theme dark or light and toggleTheme. Default dark. No persist, no OS read, no `localStorage`. | FR-THEME-001 | T-01 | done | 2026-09-05T20:26 |
+| T-03 | Sync: add `feptm-web/src/features/theme/ThemeSync.tsx` — write `document.documentElement.dataset.theme` from the store. Mount in `feptm-web/src/app/providers.tsx`. Do not set `data-theme="light"` in `feptm-web/src/app/layout.tsx`. | FR-THEME-001 | T-02 | done | 2026-09-05T20:26 |
+| T-04 | Toggle: add `feptm-web/src/components/ThemeToggle.tsx` — named export, `'use client'`, `.theme-toggle` button, sun on dark / moon on light, inline SVG `aria-hidden`, `aria-label` for the action. `// @req FR-THEME-001` above `export function ThemeToggle`. No landing labels. | FR-THEME-001 | T-03 | done | 2026-09-05T20:27 |
+| T-05 | Header: in `feptm-web/src/components/AppHeader.tsx` render `ThemeToggle` top right. Accept `inert?: boolean` on `<header>`. Keep logo + wordmark. No nav. | FR-THEME-001 | T-04 | done | 2026-09-05T20:27 |
+| T-06 | Inert: in `feptm-web/src/features/projects/ProjectDashboard.tsx` set `inert` on header, main, footer while `isCreateOverlayOpen`. In `feptm-web/src/features/projects/ProjectCard.tsx` set `inert` on header, main, footer while `isCloseOpen`. Do not add a theme button to `CreateProjectOverlay.tsx` or `ClosePeriodModal.tsx`. | FR-THEME-001 | T-05 | done | 2026-09-05T20:27 |
+| T-07 | Audit: full repo audit — zero ERR, zero WARN in touched files | FR-THEME-001 | T-06 | done | 2026-09-05T20:27 |
