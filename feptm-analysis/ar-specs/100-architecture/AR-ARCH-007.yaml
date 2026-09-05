@@ -1,0 +1,87 @@
+id: "AR-ARCH-007"
+title: "Service Lifecycle and Resource Management"
+scope: [service]
+always_apply: false
+context: "GoogleSheetsService performs OAuth credential loading and builds Drive/Sheets API resources on construction. Creating a new instance per HTTP request repeats this expensive initialization, risks OAuth rate limits, and holds no connection pool. A single uvicorn worker with no timeout on Google API calls will hang indefinitely on network issues. This spec ensures process-level resource reuse and bounded request latency."
+
+requirements:
+  - "GoogleSheetsService MUST be instantiated as a process-level singleton — one instance per worker process, cached in dependencies.py and reused across all requests."
+  - "The dependency factory get_google_sheets_service() MUST return the cached singleton instance, not construct a new GoogleSheetsService() on each call."
+  - "Google API service build (googleapiclient.discovery.build) MUST use a configurable HTTP timeout via the GOOGLE_API_TIMEOUT setting (default: 30 seconds)."
+  - "The timeout MUST be applied to the httplib2.Http object passed to build(), so all subsequent .execute() calls inherit the deadline."
+  - "Uvicorn MUST run with a configurable number of workers via the WORKERS setting (default: 4) in non-debug mode."
+  - "In DEBUG mode (reload=True), workers MUST be forced to 1 — uvicorn reload is incompatible with multi-process mode."
+  - "The singleton initialization MUST happen at first request, not at module import time — this keeps startup fast and avoids blocking the event loop before any request arrives."
+
+prohibitions:
+  - "Constructing GoogleSheetsService() inside get_google_sheets_service() on every call — the factory must cache and reuse."
+  - "Running uvicorn with workers=1 in production (non-debug) mode — a single worker cannot serve concurrent requests when one is blocked on Google I/O."
+  - "Calling googleapiclient.discovery.build() without an HTTP timeout — an unresponsive Google API must not hang the worker indefinitely."
+  - "Initializing GoogleSheetsService at module import time (module-level GoogleSheetsService()) — defer to first request via the factory."
+  - "Hardcoding timeout values in google_sheets_service.py — all timeouts must come from settings.GOOGLE_API_TIMEOUT."
+
+checks:
+  singleton-google-service:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "GoogleSheetsService must be cached as a module-level singleton in dependencies.py"
+    files: "src/feptm/dependencies.py"
+    exclude_lines:
+      - 'AR-ARCH-007:allow'
+    positive:
+      - pattern: '_google_sheets_service.*=.*None|_instance.*=.*None'
+        message: "dependencies.py must have a module-level cache variable for the singleton"
+      - pattern: 'if.*_google_sheets_service.*is None|if.*_instance.*is None'
+        message: "Factory must check if singleton exists before creating"
+
+  no-per-request-construction:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "get_google_sheets_service must not construct GoogleSheetsService() unconditionally"
+    files: "src/feptm/dependencies.py"
+    exclude_lines:
+      - 'AR-ARCH-007:allow'
+      - '^\s*#'
+    negative:
+      - pattern: '^\s*return GoogleSheetsService\(\)'
+        message: "Factory returns a new GoogleSheetsService() per call — must cache and reuse"
+
+  workers-configured:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Uvicorn runner must configure workers from settings"
+    files: "bin/run_api.py"
+    exclude_lines:
+      - 'AR-ARCH-007:allow'
+    positive:
+      - pattern: 'workers\s*='
+        message: "uvicorn.run() must specify workers parameter"
+
+  timeout-on-build:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Google API build must use an HTTP timeout"
+    files: "src/feptm/services/google_sheets_service.py"
+    exclude_lines:
+      - 'AR-ARCH-007:allow'
+    positive:
+      - pattern: 'timeout\s*=|httplib2\.Http\(.*timeout'
+        message: "Google API build must pass an HTTP timeout"
+
+  timeout-from-settings:
+    type: regex
+    severity: warn
+    aspect: architecture
+    description: "Timeout value must come from settings, not hardcoded"
+    files: "src/feptm/services/google_sheets_service.py"
+    exclude_lines:
+      - 'AR-ARCH-007:allow'
+    positive:
+      - pattern: 'settings\.GOOGLE_API_TIMEOUT'
+        message: "Timeout must be read from settings.GOOGLE_API_TIMEOUT"
+
+enforcement: []

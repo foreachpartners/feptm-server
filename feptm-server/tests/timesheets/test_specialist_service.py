@@ -160,17 +160,25 @@ class TestSpecialistStorage:
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Team", "sheetId": 123}}
+        mock_sheets.find_column_index.side_effect = lambda h, names: (
+            next((i for i, hh in enumerate(h) if hh.strip().lower() in (n.lower() for n in names)), None)
+        )
 
         spec = Specialist(name="John Doe", role="Lead Developer", timesheet="new-ts-id", row_index=2)
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [spec])
 
         assert result is True
-        mock_sheets.update_range.assert_called_once()
+        mock_sheets.batch_update.assert_called_once()
 
     def test_update_timesheet_ids_no_double_wrap_for_url_input(self, specialist_storage, mock_sheets):
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Team", "sheetId": 123}}
+        mock_sheets.find_column_index.side_effect = lambda h, names: (
+            next((i for i, hh in enumerate(h) if hh.strip().lower() in (n.lower() for n in names)), None)
+        )
 
         spec = Specialist(
             name="John Doe", role="Lead Developer",
@@ -180,8 +188,11 @@ class TestSpecialistStorage:
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [spec])
 
         assert result is True
-        call_args = mock_sheets.update_range.call_args[1]
-        assert call_args["values"] == [["https://docs.google.com/spreadsheets/d/already-a-url"]]
+        call_args = mock_sheets.batch_update.call_args[0]
+        requests = call_args[1]
+        assert len(requests) == 1
+        cell_value = requests[0]["updateCells"]["rows"][0]["values"][0]["userEnteredValue"]["stringValue"]
+        assert cell_value == "https://docs.google.com/spreadsheets/d/already-a-url"
 
     def test_update_timesheet_ids_no_updates(self, specialist_storage, mock_sheets):
         data = SAMPLE_VALUES
@@ -210,6 +221,10 @@ class TestSpecialistStorage:
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Team", "sheetId": 123}}
+        mock_sheets.find_column_index.side_effect = lambda h, names: (
+            next((i for i, hh in enumerate(h) if hh.strip().lower() in (n.lower() for n in names)), None)
+        )
 
         sp1 = Specialist(name="John Doe", role="Dev", timesheet="ts-a", row_index=2)
         sp2 = Specialist(name="Jane Smith", role="Designer", timesheet="ts-b", row_index=3)
@@ -217,10 +232,12 @@ class TestSpecialistStorage:
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [sp1, sp2])
 
         assert result is True
-        assert mock_sheets.update_range.call_count == 2
-        calls = mock_sheets.update_range.call_args_list
-        assert "Team!G2" == calls[0][1]["range_name"]
-        assert "Team!G3" == calls[1][1]["range_name"]
+        assert mock_sheets.batch_update.call_count == 1
+        call_args = mock_sheets.batch_update.call_args[0]
+        requests = call_args[1]
+        assert len(requests) == 2
+        assert requests[0]["updateCells"]["range"]["startRowIndex"] == 1
+        assert requests[1]["updateCells"]["range"]["startRowIndex"] == 2
 
     def test_prepare_updates_duplicate_names_correct_rows(self, specialist_storage, mock_sheets):
         headers = ["Name", "Role", "Project", "Internal Rate", "External Rate", "Date", "Timesheet"]
@@ -230,6 +247,10 @@ class TestSpecialistStorage:
             ["John Smith", "QA", "", "80", "100", "", ""],
         ]
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Team", "sheetId": 123}}
+        mock_sheets.find_column_index.side_effect = lambda h, names: (
+            next((i for i, hh in enumerate(h) if hh.strip().lower() in (n.lower() for n in names)), None)
+        )
 
         sp1 = Specialist(name="John Smith", role="Dev", timesheet="ts-dev", row_index=2)
         sp2 = Specialist(name="John Smith", role="QA", timesheet="ts-qa", row_index=3)
@@ -237,10 +258,12 @@ class TestSpecialistStorage:
         result = specialist_storage.update_timesheet_ids("test-id", "Team", [sp1, sp2])
 
         assert result is True
-        assert mock_sheets.update_range.call_count == 2
-        calls = mock_sheets.update_range.call_args_list
-        assert "Team!G2" == calls[0][1]["range_name"]
-        assert "Team!G3" == calls[1][1]["range_name"]
+        assert mock_sheets.batch_update.call_count == 1
+        call_args = mock_sheets.batch_update.call_args[0]
+        requests = call_args[1]
+        assert len(requests) == 2
+        assert requests[0]["updateCells"]["range"]["startRowIndex"] == 1
+        assert requests[1]["updateCells"]["range"]["startRowIndex"] == 2
 
 
 class TestSpecialistServiceFacade:
@@ -249,8 +272,12 @@ class TestSpecialistServiceFacade:
         data = SAMPLE_VALUES
         headers = SAMPLE_HEADERS
         mock_sheets.get_sheet_data_with_headers.return_value = (data, headers)
+        mock_sheets.get_sheet_by_name.return_value = {"properties": {"title": "Team", "sheetId": 123}}
         mock_sheets.ensure_spreadsheet_from_template.return_value = TIMESHEET_RESULT
         mock_sheets.find_specialist_row_index.return_value = 1
+        mock_sheets.find_column_index.side_effect = lambda h, names: (
+            next((i for i, hh in enumerate(h) if hh.strip().lower() in (n.lower() for n in names)), None)
+        )
 
         specialists, new_count = specialist_service.sync_specialists(
             "test-id", TIMESHEET_CONTEXT
@@ -258,7 +285,7 @@ class TestSpecialistServiceFacade:
 
         assert len(specialists) == 3
         assert new_count == 1
-        mock_sheets.update_range.assert_called()
+        mock_sheets.batch_update.assert_called()
 
     def test_sync_no_specialists(self, specialist_service, mock_sheets):
         mock_sheets.get_sheet_by_name.return_value = None

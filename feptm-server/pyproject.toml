@@ -107,5 +107,6 @@ dev = [
     "mypy>=1.15.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=0.21.0",
+    "types-httplib2",
     "pytest-cov>=4.0.0",
 ]

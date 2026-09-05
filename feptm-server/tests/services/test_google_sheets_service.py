@@ -101,12 +101,12 @@ def mock_google_auth():
 def mock_google_sheets_service():
     """Create a pre-configured mock of GoogleSheetsService."""
     with patch("feptm.services.google_sheets_service.settings") as mock_settings, \
-         patch("feptm.services.google_sheets_service.GoogleSheetsService._get_credentials") as mock_get_creds, \
-         patch("googleapiclient.discovery.build") as mock_build:
+         patch("feptm.services.google_sheets_service.GoogleSheetsService._get_credentials") as mock_get_creds:
         
         # Configure settings
         mock_settings.GOOGLE_CREDENTIALS_FILE = "test-credentials.json"
         mock_settings.GOOGLE_TOKEN_FILE = "test-token.json"
+        mock_settings.GOOGLE_API_TIMEOUT = 30
         
         # Mock credentials
         credentials = MagicMock()
@@ -116,27 +116,22 @@ def mock_google_sheets_service():
         mock_sheets_service = MagicMock()
         mock_drive_service = MagicMock()
         
-        # Configure build to return different services
-        mock_build.side_effect = lambda service, version, credentials, cache_discovery=None: \
-            mock_sheets_service if service == "sheets" else mock_drive_service
-        
         # Create service instance
         service = GoogleSheetsService()
         
-        # Manually set services
-        service.sheets_service = mock_sheets_service
-        service.drive_service = mock_drive_service
+        # Mock _get_services to return our mock services
+        service._get_services = MagicMock(return_value=(mock_drive_service, mock_sheets_service))
         
         yield service
 
 
 def test_is_initialized(mock_google_sheets_service):
     """Test is_initialized method."""
-    # Should return True since we set both services in the fixture
+    # Should return True since credentials are loaded
     assert mock_google_sheets_service.is_initialized() is True
     
-    # Test when one service is None
-    mock_google_sheets_service.sheets_service = None
+    # Test when credentials are None
+    mock_google_sheets_service._credentials = None
     assert mock_google_sheets_service.is_initialized() is False
 
 

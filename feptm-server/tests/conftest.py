@@ -90,8 +90,13 @@ def mock_google_sheets_service():
             "folder_id": "new-folder-id",
             "folder_url": "https://drive.google.com/drive/folders/new-folder-id",
         }
-        mock_instance.sheets_service = MagicMock()
-        mock_instance.drive_service = MagicMock()
+        
+        # Mock _get_services to return mock services
+        mock_sheets = MagicMock()
+        mock_drive = MagicMock()
+        mock_instance._get_services.return_value = (mock_drive, mock_sheets)
+        mock_instance.sheets_service = mock_sheets
+        mock_instance.drive_service = mock_drive
 
         yield mock_instance
 

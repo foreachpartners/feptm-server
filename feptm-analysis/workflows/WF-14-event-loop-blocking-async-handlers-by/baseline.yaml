@@ -1,0 +1,63 @@
+created: '2026-09-05'
+repos:
+  feptm-analysis:
+    findings: []
+    orphans: []
+  feptm-server:
+    findings:
+    - ar_spec: AR-ARCH-006
+      check: handler-uses-to-thread
+      message: 'ERR: Handler must use asyncio.to_thread() for blocking service calls'
+      severity: error
+    - ar_spec: AR-ARCH-006
+      check: no-direct-sync-service-in-handler
+      message: 'ERR: src/feptm/api/v1/projects.py:49: Direct synchronous service call
+        in async handler — wrap with asyncio.to_thread()'
+      severity: error
+    - ar_spec: AR-ARCH-006
+      check: no-direct-sync-service-in-handler
+      message: 'ERR: src/feptm/api/v1/projects.py:87: Direct synchronous service call
+        in async handler — wrap with asyncio.to_thread()'
+      severity: error
+    - ar_spec: AR-ARCH-006
+      check: no-direct-sync-service-in-handler
+      message: 'ERR: src/feptm/api/v1/projects.py:144: Direct synchronous service
+        call in async handler — wrap with asyncio.to_thread()'
+      severity: error
+    - ar_spec: AR-ARCH-006
+      check: no-direct-sync-service-in-handler
+      message: 'ERR: src/feptm/api/v1/projects.py:169: Direct synchronous service
+        call in async handler — wrap with asyncio.to_thread()'
+      severity: error
+    - ar_spec: AR-ARCH-006
+      check: no-direct-sync-service-in-handler
+      message: 'ERR: src/feptm/api/v1/projects.py:191: Direct synchronous service
+        call in async handler — wrap with asyncio.to_thread()'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: singleton-google-service
+      message: 'ERR: dependencies.py must have a module-level cache variable for the
+        singleton'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: singleton-google-service
+      message: 'ERR: Factory must check if singleton exists before creating'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: no-per-request-construction
+      message: 'ERR: src/feptm/dependencies.py:12: Factory returns a new GoogleSheetsService()
+        per call — must cache and reuse'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: workers-configured
+      message: 'ERR: uvicorn.run() must specify workers parameter'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: timeout-on-build
+      message: 'ERR: Google API build must pass an HTTP timeout'
+      severity: error
+    - ar_spec: AR-ARCH-007
+      check: timeout-from-settings
+      message: 'WARN: Timeout must be read from settings.GOOGLE_API_TIMEOUT'
+      severity: warn
+    orphans: []

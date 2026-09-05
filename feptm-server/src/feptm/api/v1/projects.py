@@ -1,5 +1,6 @@
 """API endpoints for projects."""
 
+import asyncio
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
@@ -46,7 +47,9 @@ async def list_projects() -> ProjectListResponse:
             )
 
         service: TimesheetProjectService = get_timesheet_project_service()
-        folders = service.list_projects(settings.GOOGLE_PROJECTS_FOLDER_ID)
+        folders = await asyncio.to_thread(
+            service.list_projects, settings.GOOGLE_PROJECTS_FOLDER_ID
+        )
 
         return ProjectListResponse(
             projects=[
@@ -84,7 +87,8 @@ async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
 
         service: TimesheetProjectService = get_timesheet_project_service()
 
-        result = service.create_project(
+        result = await asyncio.to_thread(
+            service.create_project,
             project_name=request.project_name,
             template_ids={
                 "info": info_id or "",
@@ -141,8 +145,8 @@ async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncRe
             )
 
         service: TimesheetProjectService = get_timesheet_project_service()
-        specialists, total, created = service.sync_project_specialists(
-            project_id=request.project_id
+        specialists, total, created = await asyncio.to_thread(
+            service.sync_project_specialists, project_id=request.project_id
         )
 
         return ProjectSyncResponse(
@@ -166,8 +170,8 @@ async def sync_project_rates(
 ) -> ProjectSyncRatesResponse:
     try:
         service: TimesheetProjectService = get_timesheet_project_service()
-        specialists, updated = service.sync_project_rates(
-            project_id=request.project_id
+        specialists, updated = await asyncio.to_thread(
+            service.sync_project_rates, project_id=request.project_id
         )
 
         return ProjectSyncRatesResponse(
@@ -188,7 +192,9 @@ async def sync_project_rates(
 async def get_project_card(drive_folder_id: str) -> ProjectCardResponse:
     try:
         service: TimesheetProjectService = get_timesheet_project_service()
-        card_data = service.get_project_card(drive_folder_id)
+        card_data = await asyncio.to_thread(
+            service.get_project_card, drive_folder_id
+        )
 
         tables = {
             "project_info": ProjectCardTable(

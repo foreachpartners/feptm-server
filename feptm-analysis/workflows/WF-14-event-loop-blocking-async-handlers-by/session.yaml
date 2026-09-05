@@ -1,0 +1,20 @@
+created: '2026-09-05'
+description: Fix event-loop blocking in async handlers by offloading sync Google API
+  calls to worker threads, singleton GoogleSheetsService, configurable workers and
+  HTTP timeout
+fr_ids:
+- FR-SYNC-001
+- FR-SYNC-RATES-001
+- FR-PAYMENT-001
+- FR-PROJECT-001
+repos:
+- feptm-server
+- feptm-analysis
+ceremony: large
+status: done
+sessions:
+  init: SID-1788628313-ed7b72fa
+  plan: SID-1788628463-6a37ab24
+  implement: SID-1788629215-4be5d2c7
+  finalize: SID-1788641048-c5fcc336
+baseline_policy: fix_all

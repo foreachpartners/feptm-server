@@ -1,5 +1,7 @@
 """API endpoints for payment periods."""
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 
 from feptm.core.exceptions import PeriodAlreadyClosedError
@@ -15,7 +17,8 @@ router = APIRouter()
 async def close_payment_period(request: ClosePeriodRequest) -> ClosePeriodResponse:
     try:
         service: TimesheetProjectService = get_timesheet_project_service()
-        return service.close_period(
+        return await asyncio.to_thread(
+            service.close_period,
             project_id=request.project_id,
             period_name=request.period_name,
         )

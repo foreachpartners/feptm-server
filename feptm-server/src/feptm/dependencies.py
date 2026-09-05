@@ -7,9 +7,14 @@ from feptm.storage.project_storage import ProjectStorage
 from feptm.storage.specialist_storage import SpecialistStorage
 from feptm.timesheets.project_service import TimesheetProjectService
 
+_google_sheets_service: GoogleSheetsService | None = None
+
 
 def get_google_sheets_service() -> GoogleSheetsService:
-    return GoogleSheetsService()
+    global _google_sheets_service
+    if _google_sheets_service is None:
+        _google_sheets_service = GoogleSheetsService()
+    return _google_sheets_service
 
 
 def get_config_storage(

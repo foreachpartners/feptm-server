@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
     API_KEY: str | None = None
+    WORKERS: int = 4
 
     # Google API settings
     GOOGLE_CREDENTIALS_FILE: Path | None = (
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
         Path(os.environ.get("HOME", os.path.expanduser("~")))
         / ".google_sheets_token.json"
     )
+    GOOGLE_API_TIMEOUT: int = 30
 
     GOOGLE_TIMESHEET_TEMPLATE_ID: str | None = None
     GOOGLE_REPORT_TEMPLATE_ID: str | None = None

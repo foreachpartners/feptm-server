@@ -1,0 +1,70 @@
+id: "AR-ARCH-006"
+title: "Non-Blocking Request Handling"
+scope: [service]
+always_apply: false
+context: "FastAPI runs on a single-threaded asyncio event loop per worker. Synchronous Google API calls (googleapiclient .execute(), time.sleep) block the loop, starving all concurrent requests (proxied GET card, list, etc.) until the blocking call completes or times out. This spec prevents event-loop starvation caused by heavy sync I/O in async handlers."
+
+requirements:
+  - "All async def API handlers (api/v1/*.py) that invoke synchronous service methods (TimesheetProjectService, storage classes, GoogleSheetsService) MUST delegate those calls via asyncio.to_thread() or an equivalent executor bridge."
+  - "The asyncio.to_thread() wrapper MUST be applied at the handler boundary — not inside storage or service internals — so the blocking call runs in a worker thread while the event loop remains free."
+  - "Each handler MUST catch Google API exceptions (GoogleSheetsRateLimitError, HttpError, TimeoutError, OSError) and return a structured JSON error response (HTTP 500 with a detail message), never let the connection hang or drop silently."
+  - "Handlers MUST NOT use bare except Exception: pass or except Exception: raise without re-raising as HTTPException — every failure path must produce a JSON body the frontend can render."
+  - "Long-running handlers (sync specialists, sync rates, close period) SHOULD log a start event at INFO level so request duration can be correlated with Google API latency spikes."
+
+prohibitions:
+  - "Calling a synchronous service method (e.g., service.sync_project_specialists(...)) directly inside an async def handler without asyncio.to_thread() or an executor."
+  - "Letting an unhandled Google API exception propagate as a dropped TCP connection — the client sees ECONNRESET instead of a JSON error."
+  - "Using time.sleep() or blocking I/O inside an async def handler — use asyncio.to_thread() or asyncio.sleep() instead."
+  - "Swallowing exceptions with bare except: pass around Google API calls in handlers — the UI must receive a failure signal, not an infinite spinner."
+
+checks:
+  handler-uses-to-thread:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Async API handlers must delegate blocking service calls via asyncio.to_thread"
+    files: "src/feptm/api/v1/*.py"
+    exclude_lines:
+      - 'AR-ARCH-006:allow'
+      - '^\s*#'
+      - '^\s*(import|from) '
+      - '^\s*async def '
+      - '^\s*if '
+      - '^\s*raise '
+      - '^\s*return '
+    positive:
+      - pattern: 'asyncio\.to_thread\('
+        message: "Handler must use asyncio.to_thread() for blocking service calls"
+
+  no-direct-sync-service-in-handler:
+    type: regex
+    severity: error
+    aspect: architecture
+    description: "Handlers must not call service methods directly without executor bridging"
+    files: "src/feptm/api/v1/*.py"
+    exclude_lines:
+      - 'AR-ARCH-006:allow'
+      - '^\s*#'
+      - '^\s*(import|from) '
+      - '^\s*async def '
+      - '^\s*if '
+      - '^\s*raise '
+      - '^\s*return '
+      - '^\s*except '
+    negative:
+      - pattern: '(?<!to_thread\()(?<!await )service\.\w+\('
+        message: "Direct synchronous service call in async handler — wrap with asyncio.to_thread()"
+
+  handler-catches-google-errors:
+    type: regex
+    severity: warn
+    aspect: architecture
+    description: "Handlers must have exception handling for Google API failures"
+    files: "src/feptm/api/v1/*.py"
+    exclude_lines:
+      - 'AR-ARCH-006:allow'
+    positive:
+      - pattern: 'except.*HTTPException|except.*Exception'
+        message: "Handler must catch exceptions and return structured JSON errors"
+
+enforcement: []
