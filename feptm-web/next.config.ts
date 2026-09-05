@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
         destination: `${apiOrigin}/api/projects/`,
       },
       {
+        source: '/api/projects/:driveFolderId/',
+        destination: `${apiOrigin}/api/projects/:driveFolderId/`,
+      },
+      {
         source: '/api/:path*',
         destination: `${apiOrigin}/api/:path*`,
       },

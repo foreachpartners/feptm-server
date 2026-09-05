@@ -5,8 +5,10 @@ description: |
   The first page is the project list.
 
   Entry: the dashboard URL in the browser. Exit on project-name click: that
-  project's card in the same tab. Exit on Create project: the create form
-  (FR-CREATE-001) as an overlay on the list.
+  project's card in a new browser tab. The dashboard list stays in the
+  previous tab. Exit on Create project: the create form (FR-CREATE-001) as
+  an overlay on the list. After a successful create the new project's card
+  opens in a new browser tab. The dashboard list stays in the previous tab.
 
   The dashboard shows project names from a single list request to the server.
   An empty list response is not a request failure.
@@ -21,6 +23,10 @@ acceptance_criteria:
   - "While the list is loading, a loading state is visible and the \"Create project\" button stays enabled."
   - "An empty server list response shows the text \"no projects\" and the \"Create project\" button."
   - "A failed list request shows the text \"Failed to load the project list. Refresh the page or try again later.\" The \"Create project\" button stays visible and enabled."
-  - "A click on a project name opens that project's card in the same browser tab, not a new window."
+  - "A click on a project name opens that project's card in a new browser tab, not a new window. The dashboard list stays in the previous tab."
   - "A click on \"Create project\" opens the create form as an overlay on the list."
+  - "After a successful project create the created project's card opens in a new browser tab, not a new window. The dashboard list stays in the previous tab."
   - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, ForEach Partners header logo, primary button as on buttons.png / header.png, list as cards.png / heading.png. MUST NOT copy marketing landing copy or the chat widget."
+
+revision_history:
+  - "v1 (2026-09-05): project-name click and successful create open the card in a new browser tab; the dashboard list stays in the previous tab."

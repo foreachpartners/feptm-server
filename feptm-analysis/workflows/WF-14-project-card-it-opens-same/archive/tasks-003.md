@@ -1,0 +1,10 @@
+# WF-14: Tasks
+
+| # | Task | Req | Depends on | Status | Completed |
+|---|------|-----|------------|--------|-----------|
+| T-01 | Helper: add `projectCardHref(driveFolderId, name)` in `feptm-web/src/features/projects/projectCardHref.ts` — relative `/projects/{id}?name={name}`, `encodeURIComponent`, no host | FR-PROJECT-001, FR-CREATE-001 | — | done | 2026-09-05T18:32 |
+| T-02 | List: use `projectCardHref` in `feptm-web/src/features/projects/ProjectNameList.tsx`; keep Next.js `Link`; add `target="_blank"` `rel="noopener noreferrer"`; do not use `window.open` or `router.push` | FR-PROJECT-001 | T-01 | done | 2026-09-05T18:32 |
+| T-03 | Create: remove `router.push` from `feptm-web/src/features/projects/useCreateProject.ts`; in `feptm-web/src/features/projects/CreateProjectOverlay.tsx` `handleSubmit` open `about:blank` with `window.open('about:blank', '_blank')` (no features string) and pass Window or null into the mutation; on success close overlay, invalidate `['projects']`, `location.replace(projectCardHref(...))`, `opener = null`; on error / missing `drive_folder_id` close the placeholder tab; if `window.open` is null, still create and fallback `window.open(href, '_blank', 'noopener,noreferrer')` | FR-CREATE-001 | T-01 | done | 2026-09-05T18:33 |
+| T-04 | Heading: split `h1.project-card__heading` in `feptm-web/src/features/projects/ProjectCard.tsx` into word `Project` (`var(--accent)`) and name (`var(--foreground)`); add span classes in `feptm-web/src/app/globals.css`; one `h1`; no hex, no new tokens | FR-SYNC-001 | — | done | 2026-09-05T18:33 |
+| T-05 | Commands: in `feptm-web/src/features/projects/ProjectCard.tsx` replace Update rates and Close period `.secondary-button` with `PrimaryButton`; do not change Confirm/Cancel in `feptm-web/src/features/projects/ClosePeriodModal.tsx` | FR-SYNC-RATES-001, FR-PAYMENT-001 | T-04 | done | 2026-09-05T18:33 |
+| T-06 | Audit: full repo audit — zero ERR, zero WARN in touched files | FR-PROJECT-001, FR-CREATE-001, FR-SHEET-001, FR-SYNC-001, FR-SYNC-RATES-001, FR-PAYMENT-001 | T-02, T-03, T-05 | done | 2026-09-05T18:35 |

@@ -133,6 +133,11 @@ body {
   cursor: pointer;
 }
 
+.secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .project-name-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
@@ -213,6 +218,114 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
+}
+
+.create-overlay__status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.create-overlay__error {
+  margin: 0;
+  color: var(--error);
+}
+
+.create-overlay__warning {
+  margin: 0;
+  color: var(--muted);
+}
+
+.project-card {
+  width: min(100% - 2rem, 72rem);
+  margin: 0 auto;
+  padding: var(--space-xl) 0;
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.project-card__back {
+  justify-self: start;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.project-card__back:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.project-card__heading {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.project-card__heading-label {
+  color: var(--accent);
+}
+
+.project-card__heading-name {
+  color: var(--foreground);
+}
+
+.project-card__commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.project-card__status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.project-card__error {
+  margin: 0;
+  color: var(--error);
+}
+
+.project-card__tables {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.project-card__tables-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.project-card__table-list {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-card__table-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.project-card__table-link {
+  display: block;
+  padding: var(--space-md) var(--space-lg);
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.project-card__table-link:hover {
+  color: var(--accent);
 }
 
 .app-footer {

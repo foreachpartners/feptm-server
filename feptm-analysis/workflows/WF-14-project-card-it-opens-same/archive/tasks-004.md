@@ -1,0 +1,7 @@
+# WF-14: Tasks
+
+| # | Task | Req | Depends on | Status | Completed |
+|---|------|-----|------------|--------|-----------|
+| T-01 | Overlay: in `feptm-web/src/features/projects/CreateProjectOverlay.tsx` `handleSubmit` replace `window.open('about:blank', '_blank')` with `window.open('', '_blank')` (no features). If Window is non-null, `document.open` / static `document.write` titled `Creating...` / `document.close`. Pass `{ cardTab, name }` into `useCreateProject`. If open is null or write throws, still mutate. Do not change overlay markup, validation, or error text. | FR-CREATE-001 | — | done | 2026-09-05T19:20 |
+| T-02 | Handoff: in `feptm-web/src/features/projects/useCreateProject.ts` `onSuccess` — missing `drive_folder_id`: `cardTab?.close()`, overlay stays. If `cardTab`: `location.replace` absolute `projectCardHref` from `feptm-web/src/features/projects/projectCardHref.ts`, then `opener = null`, then `closeCreateOverlay()`, then invalidate `['projects']`. If replace throws: `cardTab.close()`, `window.open(href, '_blank', 'noopener,noreferrer')`, then close overlay and invalidate. If `cardTab` is null: same fallback `window.open`, then close and invalidate. `onError`: `cardTab?.close()`. Do not close overlay before replace or fallback. Do not change `mutationFn` or `feptm-web/src/lib/api/projects.ts`. | FR-CREATE-001 | T-01 | done | 2026-09-05T19:21 |
+| T-03 | Audit: full repo audit — zero ERR, zero WARN in touched files | FR-PROJECT-001, FR-CREATE-001, FR-SHEET-001, FR-SYNC-001, FR-SYNC-RATES-001, FR-PAYMENT-001 | T-02 | done | 2026-09-05T19:26 |

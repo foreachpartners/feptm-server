@@ -11,9 +11,9 @@ description: |
 
   On the project card the user starts rate update with the Update rates button.
 
-  Entry: the project card in the same dashboard tab (project-name click on the
+  Entry: the project card in a new browser tab (project-name click on the
   dashboard, FR-PROJECT-001, or after successful project creation,
-  FR-CREATE-001). Not a new browser window.
+  FR-CREATE-001). The dashboard list stays in the previous tab.
 
   Exit: the same project card. After Update rates the card shows a short
   result: success "Rates updated: N." or failure "Failed to update rates.
@@ -35,11 +35,11 @@ acceptance_criteria:
   - "Running sync again without changing rates does not modify the calculation results."
   - "The project card shows an Update rates button in the same row as Update team."
   - "A Back to project list button is at the top left. A click returns to the dashboard list in the same tab, not a new window."
-  - "The project card opens in the same dashboard tab, not a new browser window."
+  - "The project card opens in a new browser tab. The dashboard list stays in the previous tab."
   - "While any command operation is in progress on the card (Update team, Update rates, Close period), Update team, Update rates, Close period, and Back to project list are disabled. While Update rates is in progress the status is \"Updating rates...\". A repeated Update rates click does not send a second request. The user MUST NOT leave to the list until the operation finishes."
   - "On a successful sync-rates response the card shows \"Rates updated: N.\" where N is specialists_updated from the response, including 0. The card does not close. Command buttons and Back to project list are enabled again."
   - "A failed request and a network timeout show the text \"Failed to update rates. Try again later.\" on the card. The card does not close. Command buttons and Back to project list are enabled again."
-  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Update rates is a secondary (outline) button as on buttons.png / footer.png, in the same row as Update team. MUST NOT invent a third palette. MUST NOT copy marketing landing copy or the chat widget."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Update rates is a primary button, same style and colors as Update team on buttons.png / header.png, in the same row as Update team. MUST NOT invent a third palette. MUST NOT copy marketing landing copy or the chat widget."
 
 implements:
   - src/feptm/api/v1/projects.py::sync_project_specialists
@@ -57,3 +57,5 @@ revision_history:
   - "v4 (2026-08-08, WF-1): rate sync requires timesheet IDs in Team; the complete sync lifecycle is defined in FR-SYNC-001."
   - "v5 (2026-08-14, commit TBD): recalculation includes every work entry with an empty Payment Period for the specialist whose rate changed and does not use Date for entry selection; for an invalid rate, sync preserves the previous rates and calculations, writes an ERROR log containing the specialist name, rate type, and invalid value, and then continues processing other valid rows."
   - "v6 (2026-09-01): dashboard Update rates; status Updating rates...; command buttons and Back locked during the operation; Back to project list; success Rates updated: N; failure Failed to update rates; secondary button per ui-style; depends_on FR-PROJECT-001."
+  - "v7 (2026-09-05): the card opens in a new browser tab on a project-name click or after a successful create; the dashboard list stays in the previous tab."
+  - "v8 (2026-09-05): Update rates is a primary button, same style and colors as Update team."

@@ -1,7 +1,9 @@
-export default function ProjectPage() {
-  return (
-    <main>
-      <h1>Project details</h1>
-    </main>
-  );
+'use client';
+
+import type { ReactElement } from 'react';
+
+import { ProjectCard } from '@/features/projects/ProjectCard';
+
+export default function ProjectPage(): ReactElement {
+  return <ProjectCard />;
 }

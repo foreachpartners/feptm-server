@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { projectCardHref } from '@/features/projects/projectCardHref';
 import type { ProjectListItem } from '@/types/project';
 
 interface ProjectNameListProps {
@@ -14,11 +15,16 @@ export function ProjectNameList({ projects }: ProjectNameListProps) {
   return (
     <ul className="project-name-list">
       {sorted.map((project) => {
-        const href = `/projects/${encodeURIComponent(project.drive_folder_id)}?name=${encodeURIComponent(project.name)}`;
+        const href = projectCardHref(project.drive_folder_id, project.name);
 
         return (
           <li className="project-name-list__item" key={project.drive_folder_id}>
-            <Link className="project-name-list__link" href={href}>
+            <Link
+              className="project-name-list__link"
+              href={href}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
               {project.name}
             </Link>
           </li>

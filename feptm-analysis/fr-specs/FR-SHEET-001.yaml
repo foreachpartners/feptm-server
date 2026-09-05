@@ -3,8 +3,9 @@ title: Open project Google Sheets from the project card
 description: |
   The user opens project Google Sheets from the project card.
 
-  Entry: the project card in the same dashboard tab (project-name click,
+  Entry: the project card in a new browser tab (project-name click,
   FR-PROJECT-001, or after successful creation, FR-CREATE-001).
+  The dashboard list stays in the previous tab.
 
   A click on a link opens Google Sheets in a new tab. The dashboard card is
   not replaced and does not close.
@@ -34,3 +35,6 @@ acceptance_criteria:
   - "A click on any shown link opens the matching Google spreadsheet in a new tab. The dashboard card stays in the previous tab."
   - "No link without a URL. Every shown link opens an existing spreadsheet of this project."
   - "Visual style MUST match docs/ui-style.md: secondary controls as the outline on buttons.png or chips on cards.png. MUST NOT copy marketing landing copy or the chat widget."
+
+revision_history:
+  - "v1 (2026-09-05): the card opens in a new browser tab on a project-name click or after a successful create; the dashboard list stays in the previous tab."
