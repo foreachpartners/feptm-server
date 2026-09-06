@@ -141,7 +141,6 @@ class TimesheetProjectService:
                 self._projects.update_current_period(
                     project.calculations_spreadsheet_id, sp, self._formulas
                 )
-            time.sleep(0.25)  # AR-ARCH-005:allow
 
         log.info(
             "Synchronized %d specialists, created %d new timesheets",
@@ -167,8 +166,6 @@ class TimesheetProjectService:
         context = TimesheetContext(
             folder_id=project.drive_folder_id, project_name=project.name
         )
-
-        specialists, _ = self._specialists.list_from_sheet(project_id)
 
         for sp in specialists:
             sp.project = project.name
@@ -220,28 +217,47 @@ class TimesheetProjectService:
         if created_count > 0:
             self._specialists.update_timesheet_ids(project_id, "Team", valid_specialists)
 
-        for sp in valid_specialists:
-            if not sp.timesheet:
-                continue
-            import_formula = self._formulas.get_import_timesheet_formula(
-                sp.timesheet
-            )
+        specialists_with_timesheets = [sp for sp in valid_specialists if sp.timesheet]
+
+        if specialists_with_timesheets:
             if project.report_spreadsheet_id:
-                self._projects.add_specialist_to_report(
-                    project.report_spreadsheet_id, sp, import_formula
-                )
-                self._projects.sync_rates_to_current_period(
-                    project.report_spreadsheet_id, sp
+                self._projects.batch_add_sheets(
+                    project.report_spreadsheet_id, specialists_with_timesheets
                 )
             if project.calculations_spreadsheet_id:
-                self._projects.add_specialist_to_report(
-                    project.calculations_spreadsheet_id, sp, import_formula
-                )
-                self._projects.sync_rates_to_current_period(
-                    project.calculations_spreadsheet_id, sp
+                self._projects.batch_add_sheets(
+                    project.calculations_spreadsheet_id, specialists_with_timesheets
                 )
 
-        updated_count = sum(1 for sp in valid_specialists if sp.timesheet)
+        formulas_report: list[tuple[str, str]] = []
+        formulas_calc: list[tuple[str, str]] = []
+        for sp in specialists_with_timesheets:
+            import_formula = self._formulas.get_import_timesheet_formula(sp.timesheet or "")
+            if project.report_spreadsheet_id:
+                formulas_report.append((sp.name, import_formula))
+            if project.calculations_spreadsheet_id:
+                formulas_calc.append((sp.name, import_formula))
+
+        if formulas_report and project.report_spreadsheet_id:
+            self._projects.batch_write_a1_formulas(
+                project.report_spreadsheet_id, formulas_report
+            )
+        if formulas_calc and project.calculations_spreadsheet_id:
+            self._projects.batch_write_a1_formulas(
+                project.calculations_spreadsheet_id, formulas_calc
+            )
+
+        if specialists_with_timesheets:
+            if project.report_spreadsheet_id:
+                self._projects.sync_rates_batch(
+                    project.report_spreadsheet_id, specialists_with_timesheets
+                )
+            if project.calculations_spreadsheet_id:
+                self._projects.sync_rates_batch(
+                    project.calculations_spreadsheet_id, specialists_with_timesheets
+                )
+
+        updated_count = len(specialists_with_timesheets)
         log.info("Synced rates for %d specialists", updated_count)
         return specialists, updated_count
 

@@ -44,6 +44,22 @@ class ProjectStorageProtocol(Protocol):
         """Create specialist tab and populate Current Period in a report sheet."""
         ...
 
+    def batch_add_sheets(
+        self,
+        spreadsheet_id: str,
+        specialists: list[Specialist],
+    ) -> None:
+        """Create multiple specialist tabs in a single batch update."""
+        ...
+
+    def batch_write_a1_formulas(
+        self,
+        spreadsheet_id: str,
+        formulas: list[tuple[str, str]],
+    ) -> None:
+        """Write A1 formulas to multiple tabs in a single batch update."""
+        ...
+
     def update_current_period(
         self,
         spreadsheet_id: str,
@@ -59,6 +75,14 @@ class ProjectStorageProtocol(Protocol):
         specialist: Specialist,
     ) -> None:
         """Update rate fields for an existing specialist in the Current Period sheet."""
+        ...
+
+    def sync_rates_batch(
+        self,
+        spreadsheet_id: str,
+        specialists: list[Specialist],
+    ) -> None:
+        """Batch update rate fields for multiple specialists in the Current Period sheet."""
         ...
 
     def close_period_in_timesheet(
@@ -132,6 +156,12 @@ class SpecialistStorageProtocol(Protocol):
         self, specialist: Specialist, context: TimesheetContext, template_id: str
     ) -> dict[str, str]:
         """Create a timesheet spreadsheet from template for a specialist."""
+        ...
+
+    def find_existing_timesheets(
+        self, folder_id: str, specialist_names: list[str], project_name: str
+    ) -> dict[str, str]:
+        """Find existing timesheet spreadsheets in a folder by specialist names."""
         ...
 
     def update_timesheet_ids(

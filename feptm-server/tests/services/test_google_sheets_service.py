@@ -158,7 +158,10 @@ def test_get_sheet_by_name_found(mock_google_sheets_service):
     assert result["properties"]["sheetId"] == 1
     
     # Verify API call
-    spreadsheets_resource.get.assert_called_once_with(spreadsheetId=spreadsheet_id)
+    spreadsheets_resource.get.assert_called_once_with(
+        spreadsheetId=spreadsheet_id,
+        fields="sheets(properties(title,sheetId))",
+    )
 
 
 def test_get_sheet_by_name_not_found(mock_google_sheets_service):

@@ -1,0 +1,17 @@
+created: '2026-09-07'
+description: Optimize Google Sheets API calls in sync_project_rates and specialist
+  sync flows
+fr_ids:
+- FR-SYNC-001
+- FR-SYNC-RATES-001
+- FR-SPECIALIST-001
+repos:
+- feptm-server
+ceremony: medium
+status: done
+sessions:
+  init: SID-1788724029-a4befae1
+  plan: SID-1788729653-98975648
+  implement: SID-1788730073-2f18fb7b
+  finalize: SID-1788734427-af69d0d9
+baseline_policy: ignore

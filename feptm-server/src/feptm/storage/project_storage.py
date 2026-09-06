@@ -253,6 +253,29 @@ class ProjectStorage:
             calculations_spreadsheet_id=calculations_spreadsheet_id,
         )
 
+    def _read_cell_formula(
+        self, spreadsheet_id: str, sheet_name: str, cell: str
+    ) -> str | None:
+        if not self._sheets.sheets_service:
+            raise Exception("Google Sheets service not initialized")
+        try:
+            result = (
+                self._sheets.sheets_service.spreadsheets()
+                .values()
+                .get(
+                    spreadsheetId=spreadsheet_id,
+                    range=f"{sheet_name}!{cell}",
+                    valueRenderOption="FORMULA",
+                )
+                .execute()
+            )
+            values = result.get("values", [])
+            if not values or not values[0]:
+                return None
+            return str(values[0][0])
+        except Exception:
+            return None
+
     def add_specialist_to_report(
         self,
         spreadsheet_id: str,
@@ -266,13 +289,23 @@ class ProjectStorage:
                 spreadsheet_id=spreadsheet_id,
                 requests=[{"addSheet": {"properties": {"title": tab_name}}}],
             )
+            self._sheets.invalidate_metadata_cache(spreadsheet_id)
             log.info("Created tab for %s in spreadsheet", specialist.name)
-        self._sheets.update_range(
-            spreadsheet_id=spreadsheet_id,
-            range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
-            values=[[import_formula]],
-            value_input_option="USER_ENTERED",
-        )
+            self._sheets.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
+                values=[[import_formula]],
+                value_input_option="USER_ENTERED",
+            )
+        else:
+            current = self._read_cell_formula(spreadsheet_id, tab_name, "A1")
+            if current != import_formula:
+                self._sheets.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
+                    values=[[import_formula]],
+                    value_input_option="USER_ENTERED",
+                )
 
     def update_current_period(
         self,
@@ -326,6 +359,122 @@ class ProjectStorage:
             self._sheets, spreadsheet_id, sheet_id, target_row, specialist, headers
         )
 
+    def sync_rates_batch(
+        self,
+        spreadsheet_id: str,
+        specialists: list[Specialist],
+    ) -> None:
+        sheet_name = SheetName.CURRENT_PERIOD.value
+        sheet_data = self._read_current_period(spreadsheet_id, sheet_name)
+        if not sheet_data:
+            return
+        values, headers, sheet = sheet_data
+        sheet_id = sheet.get("properties", {}).get("sheetId")
+
+        requests: list[dict[str, Any]] = []
+        for specialist in specialists:
+            target_row = _find_specialist_row(
+                values, headers, specialist.name, self._sheets
+            )
+            if target_row is None:
+                continue
+
+            field_updates = [
+                (ColumnName.SPECIALIST.value, specialist.name),
+                (ColumnName.SPECIALIST_ROLE.value, specialist.role),
+                (ColumnName.HOURLY_RATE_USD.value, specialist.external_rate),
+                (ColumnName.SPECIALIST_HOURLY_RATE_USD.value, specialist.internal_rate),
+                (ColumnName.CLIENT_HOURLY_RATE_USD.value, specialist.external_rate),
+            ]
+
+            row_index = target_row - 1
+            for col_name, val in field_updates:
+                col_idx = self._sheets.find_column_index(headers, [col_name])
+                if col_idx is None or val is None:
+                    continue
+
+                if isinstance(val, str):
+                    entry: dict[str, Any] = {"stringValue": val}
+                else:
+                    entry = {"numberValue": float(val)}
+
+                requests.append(
+                    {
+                        "updateCells": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": row_index,
+                                "endRowIndex": row_index + 1,
+                                "startColumnIndex": col_idx,
+                                "endColumnIndex": col_idx + 1,
+                            },
+                            "rows": [{"values": [{"userEnteredValue": entry}]}],
+                            "fields": "userEnteredValue",
+                        }
+                    }
+                )
+
+        if requests:
+            self._sheets.batch_update(spreadsheet_id, requests)
+
+    def batch_add_sheets(
+        self,
+        spreadsheet_id: str,
+        specialists: list[Specialist],
+    ) -> None:
+        existing = set(self._list_sheet_titles(spreadsheet_id))
+        new_names = [sp.name for sp in specialists if sp.name not in existing]
+        if not new_names:
+            return
+
+        requests = [
+            {"addSheet": {"properties": {"title": name}}}
+            for name in new_names
+        ]
+        self._sheets.batch_update(spreadsheet_id, requests)
+        self._sheets.invalidate_metadata_cache(spreadsheet_id)
+        log.info("Created %d tabs in spreadsheet", len(new_names))
+
+    def batch_write_a1_formulas(
+        self,
+        spreadsheet_id: str,
+        formulas: list[tuple[str, str]],
+    ) -> None:
+        if not formulas:
+            return
+
+        sheets = self._sheets.get_all_sheets(spreadsheet_id)
+        sheet_id_map = {
+            s.get("properties", {}).get("title"): s.get("properties", {}).get("sheetId")
+            for s in sheets
+        }
+
+        requests: list[dict[str, Any]] = []
+        for tab_name, formula in formulas:
+            sheet_id = sheet_id_map.get(tab_name)
+            if sheet_id is None:
+                continue
+            requests.append(
+                {
+                    "updateCells": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": 0,
+                            "endRowIndex": 1,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 1,
+                        },
+                        "rows": [
+                            {"values": [{"userEnteredValue": {"formulaValue": formula}}]}
+                        ],
+                        "fields": "userEnteredValue",
+                    }
+                }
+            )
+
+        if requests:
+            self._sheets.batch_update(spreadsheet_id, requests)
+
     def _create_from_template(
         self, template_id: str, new_title: str, folder_id: str
     ) -> dict[str, str]:
@@ -342,14 +491,10 @@ class ProjectStorage:
     def _list_sheet_titles(self, spreadsheet_id: str) -> list[str]:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
-        spreadsheet = (
-            self._sheets.sheets_service.spreadsheets()
-            .get(spreadsheetId=spreadsheet_id)
-            .execute()
-        )
+        sheets = self._sheets.get_all_sheets(spreadsheet_id)
         return [
             s.get("properties", {}).get("title", "")
-            for s in spreadsheet.get("sheets", [])
+            for s in sheets
         ]
 
     def _read_current_period(
@@ -411,6 +556,7 @@ class ProjectStorage:
                         }
                     ],
                 )
+                self._sheets.invalidate_metadata_cache(spreadsheet_id)
             except Exception as exc:
                 log.warning("Failed to insert row, continuing: %s", exc)
 
@@ -445,13 +591,9 @@ class ProjectStorage:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
 
-        spreadsheet = (
-            self._sheets.sheets_service.spreadsheets()
-            .get(spreadsheetId=spreadsheet_id)
-            .execute()
-        )
+        sheets = self._sheets.get_all_sheets(spreadsheet_id)
         sheet_id = None
-        for s in spreadsheet.get("sheets", []):
+        for s in sheets:
             if s.get("properties", {}).get("title") == sheet_name:
                 sheet_id = s.get("properties", {}).get("sheetId")
                 break
@@ -517,12 +659,7 @@ class ProjectStorage:
             utils.extract_id_from_hyperlink_formula(timesheet_id) or timesheet_id
         )
 
-        spreadsheet = (
-            self._sheets.sheets_service.spreadsheets()
-            .get(spreadsheetId=timesheet_id)
-            .execute()
-        )
-        sheets_list = spreadsheet.get("sheets", [])
+        sheets_list = self._sheets.get_all_sheets(timesheet_id)
         if not sheets_list:
             return 0
         sheet_name = sheets_list[0].get("properties", {}).get("title", "")
@@ -621,6 +758,7 @@ class ProjectStorage:
                 }
             }],
         )
+        self._sheets.invalidate_metadata_cache(spreadsheet_id)
 
         # Read all values with UNFORMATTED_VALUE and write back as RAW
         # This replaces formulas with their computed values
@@ -686,13 +824,9 @@ class ProjectStorage:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
 
-        spreadsheet = (
-            self._sheets.sheets_service.spreadsheets()
-            .get(spreadsheetId=spreadsheet_id)
-            .execute()
-        )
+        sheets = self._sheets.get_all_sheets(spreadsheet_id)
         sheet_id = None
-        for sheet in spreadsheet.get("sheets", []):
+        for sheet in sheets:
             if sheet.get("properties", {}).get("title") == sheet_name:
                 sheet_id = sheet.get("properties", {}).get("sheetId")
                 break
@@ -704,6 +838,7 @@ class ProjectStorage:
             spreadsheet_id=spreadsheet_id,
             requests=[{"deleteSheet": {"sheetId": sheet_id}}],
         )
+        self._sheets.invalidate_metadata_cache(spreadsheet_id)
         log.info("Deleted sheet %s from spreadsheet %s", sheet_name, spreadsheet_id)
         return True
 
@@ -858,13 +993,9 @@ class ProjectStorage:
         if not self._sheets.sheets_service:
             raise Exception("Google Sheets service not initialized")
 
-        spreadsheet = (
-            self._sheets.sheets_service.spreadsheets()
-            .get(spreadsheetId=spreadsheet_id)
-            .execute()
-        )
+        sheets = self._sheets.get_all_sheets(spreadsheet_id)
         sheet_id = None
-        for s in spreadsheet.get("sheets", []):
+        for s in sheets:
             if s.get("properties", {}).get("title") == sheet_name:
                 sheet_id = s.get("properties", {}).get("sheetId")
                 break

@@ -15,11 +15,24 @@ class ConfigStorage:
         self._sheets = sheets_service
         self._config_sheet_id = config_sheet_id
         self._cache: dict[str, str] = {}
+        self._all_formulas_loaded: bool = False
 
     def get_formula(self, formula_name: str) -> str:
         if formula_name in self._cache:
             return self._cache[formula_name]
 
+        if not self._all_formulas_loaded:
+            self._load_all_formulas()
+            self._all_formulas_loaded = True
+
+        if formula_name in self._cache:
+            return self._cache[formula_name]
+
+        raise Exception(
+            f"Formula '{formula_name}' not found in configuration spreadsheet"
+        )
+
+    def _load_all_formulas(self) -> None:
         if not self._sheets.is_initialized():
             raise Exception("Google Sheets service not initialized")
 
@@ -51,14 +64,8 @@ class ConfigStorage:
             if len(row) >= 2:
                 name: str = row[0].strip()
                 formula: str = row[1].strip()
-                if formula:
+                if name and formula:
                     self._cache[name] = formula
-                if name == formula_name and formula:
-                    return formula
-
-        raise Exception(
-            f"Formula '{formula_name}' not found in configuration spreadsheet"
-        )
 
     def get_import_timesheet_formula(self, specialist_timesheet_id: str) -> str:
         formula = self.get_formula("Import specialist timesheet")

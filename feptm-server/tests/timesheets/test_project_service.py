@@ -161,11 +161,9 @@ class TestProjectStorage:
         mock_sheets.delete_file.assert_called_once_with("new-folder-id")
 
     def test_copy_row_formatting_uses_paste_formula_and_paste_format(self, project_storage, mock_sheets):
-        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
-            "sheets": [
-                {"properties": {"title": "Current period", "sheetId": 100}},
-            ]
-        }
+        mock_sheets.get_all_sheets.return_value = [
+            {"properties": {"title": "Current period", "sheetId": 100}},
+        ]
 
         project_storage._copy_row_formatting(
             "spreadsheet-id", "Current period", source_row=3, target_row=5
@@ -217,9 +215,7 @@ class TestProjectStorage:
     def test_add_specialist_to_report_updates_formula_when_tab_exists(self, project_storage, mock_sheets):
         from feptm.models.specialist import Specialist
 
-        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
-            "sheets": [{"properties": {"title": "John Doe"}}],
-        }
+        mock_sheets.get_all_sheets.return_value = [{"properties": {"title": "John Doe"}}]
 
         spec = Specialist(name="John Doe", role="Dev", timesheet="ts-id")
         formula = '=IMPORTRANGE("ts-id";"Sheet1!A:Z")'
@@ -237,9 +233,7 @@ class TestProjectStorage:
     def test_add_specialist_to_report_creates_tab_and_writes_formula_when_absent(self, project_storage, mock_sheets):
         from feptm.models.specialist import Specialist
 
-        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
-            "sheets": [],
-        }
+        mock_sheets.get_all_sheets.return_value = []
 
         spec = Specialist(name="John Doe", role="Dev", timesheet="ts-id")
         formula = '=IMPORTRANGE("ts-id";"Sheet1!A:Z")'
@@ -323,12 +317,10 @@ class TestProjectStorage:
         assert period_values == [["Aug 2026"], ["Aug 2026"], [""]]
 
     def test_delete_sheet_deletes_existing_tab(self, project_storage, mock_sheets):
-        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
-            "sheets": [
-                {"properties": {"title": "Current period", "sheetId": 1}},
-                {"properties": {"title": "Aug 2026", "sheetId": 2}},
-            ],
-        }
+        mock_sheets.get_all_sheets.return_value = [
+            {"properties": {"title": "Current period", "sheetId": 1}},
+            {"properties": {"title": "Aug 2026", "sheetId": 2}},
+        ]
 
         result = project_storage.delete_sheet("spreadsheet-id", "Aug 2026")
 
@@ -339,11 +331,9 @@ class TestProjectStorage:
         )
 
     def test_delete_sheet_returns_false_when_tab_not_found(self, project_storage, mock_sheets):
-        mock_sheets.sheets_service.spreadsheets.return_value.get.return_value.execute.return_value = {
-            "sheets": [
-                {"properties": {"title": "Current period", "sheetId": 1}},
-            ],
-        }
+        mock_sheets.get_all_sheets.return_value = [
+            {"properties": {"title": "Current period", "sheetId": 1}},
+        ]
 
         result = project_storage.delete_sheet("spreadsheet-id", "Aug 2026")
 
@@ -480,16 +470,19 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         specialists, updated = project_service.sync_project_rates("test-project-id")
 
         assert updated == 2
         assert len(specialists) == 2
-        assert mock_add.call_count == 4
-        assert mock_update.call_count == 4
+        assert mock_add.call_count == 2
+        assert mock_formulas.call_count == 2
+        assert mock_update.call_count == 2
 
     def test_sync_project_rates_empty_sheet(self, project_service):
         project_service._projects.get_project_metadata = MagicMock(
@@ -527,11 +520,13 @@ class TestProjectServiceFacade:
         mock_create = MagicMock()
         mock_write = MagicMock()
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
         project_service._specialists.create_timesheet = mock_create
         project_service._specialists.update_timesheet_ids = mock_write
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         specialists, updated = project_service.sync_project_rates("test-id")
 
@@ -540,6 +535,7 @@ class TestProjectServiceFacade:
         mock_create.assert_called_once()
         mock_write.assert_called_once()
         mock_add.assert_not_called()
+        mock_formulas.assert_not_called()
         mock_update.assert_not_called()
 
     def test_sync_rates_aborts_on_duplicate_names(self, project_service):
@@ -570,9 +566,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             result = project_service.sync_project_rates("test-project-id")
@@ -582,6 +580,7 @@ class TestProjectServiceFacade:
         assert "Duplicate specialist names" in mock_log.error.call_args[0][0]
         assert "John Smith" in mock_log.error.call_args[0][1]
         mock_add.assert_not_called()
+        mock_formulas.assert_not_called()
         mock_update.assert_not_called()
 
     def test_sync_no_collision_proceeds_normally(self, project_service):
@@ -612,17 +611,20 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             result = project_service.sync_project_rates("test-project-id")
 
         assert result[1] == 2
         mock_log.error.assert_not_called()
-        assert mock_add.call_count == 2
-        assert mock_update.call_count == 2
+        assert mock_add.call_count == 1
+        assert mock_formulas.call_count == 1
+        assert mock_update.call_count == 1
 
     def test_sync_aborts_on_duplicate_names(self, project_service):
 
@@ -883,9 +885,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             specialists, updated = project_service.sync_project_rates("test-project-id")
@@ -900,6 +904,7 @@ class TestProjectServiceFacade:
         assert "is not a valid number" in error_args[0]
         assert "Previous rate retained" in error_args[0]
         assert mock_add.call_count == 1
+        assert mock_formulas.call_count == 1
         assert mock_update.call_count == 1
 
     def test_sync_rates_both_rates_invalid(self, project_service):
@@ -924,9 +929,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             specialists, updated = project_service.sync_project_rates("test-project-id")
@@ -935,6 +942,7 @@ class TestProjectServiceFacade:
         assert len(specialists) == 1
         assert mock_log.error.call_count == 2
         mock_add.assert_not_called()
+        mock_formulas.assert_not_called()
         mock_update.assert_not_called()
 
     def test_sync_rates_one_rate_invalid(self, project_service):
@@ -961,9 +969,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             specialists, updated = project_service.sync_project_rates("test-project-id")
@@ -975,6 +985,7 @@ class TestProjectServiceFacade:
         assert "external_rate='<empty>'" in error_args[0]
         assert "Jane" in error_args[1]
         mock_add.assert_not_called()
+        mock_formulas.assert_not_called()
         mock_update.assert_not_called()
 
     def test_sync_rates_all_valid_no_error(self, project_service):
@@ -1006,9 +1017,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             specialists, updated = project_service.sync_project_rates("test-project-id")
@@ -1016,8 +1029,9 @@ class TestProjectServiceFacade:
         assert updated == 2
         assert len(specialists) == 2
         mock_log.error.assert_not_called()
-        assert mock_add.call_count == 4
-        assert mock_update.call_count == 4
+        assert mock_add.call_count == 2
+        assert mock_formulas.call_count == 2
+        assert mock_update.call_count == 2
 
     def test_sync_rates_negative_rate_logs_error_and_skips(self, project_service):
         from decimal import Decimal
@@ -1047,9 +1061,11 @@ class TestProjectServiceFacade:
         )
 
         mock_add = MagicMock()
+        mock_formulas = MagicMock()
         mock_update = MagicMock()
-        project_service._projects.add_specialist_to_report = mock_add
-        project_service._projects.sync_rates_to_current_period = mock_update
+        project_service._projects.batch_add_sheets = mock_add
+        project_service._projects.batch_write_a1_formulas = mock_formulas
+        project_service._projects.sync_rates_batch = mock_update
 
         with patch("feptm.timesheets.project_service.log") as mock_log:
             specialists, updated = project_service.sync_project_rates("test-project-id")
@@ -1063,6 +1079,7 @@ class TestProjectServiceFacade:
         assert "must be non-negative" in error_args[0]
         assert "Previous period retained" in error_args[0] or "Previous rate retained" in error_args[0]
         assert mock_add.call_count == 1
+        assert mock_formulas.call_count == 1
         assert mock_update.call_count == 1
 
     def test_close_period_raises_when_period_already_closed_in_report(self, project_service):

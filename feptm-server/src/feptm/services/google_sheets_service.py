@@ -1,5 +1,6 @@
 """Service for working with Google Sheets API."""
 
+import contextvars
 import json
 import random
 import time
@@ -20,6 +21,10 @@ from feptm.core.log import log
 # Suppress googleapiclient discovery cache warnings
 import logging
 logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.WARNING)
+
+_metadata_cache: contextvars.ContextVar[dict[str, dict[str, Any]]] = (
+    contextvars.ContextVar("_metadata_cache", default={})
+)
 
 
 class GoogleSheetsRateLimitError(Exception):
@@ -213,6 +218,50 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to create spreadsheet: {error}")
 
+    def get_all_sheets(self, spreadsheet_id: str) -> list[dict[str, Any]]:
+        """Return all sheets for a spreadsheet, using cache if available.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+
+        Returns:
+            List of sheet metadata dicts
+        """
+        cache = _metadata_cache.get({})
+        if spreadsheet_id in cache:
+            return cast(list[dict[str, Any]], cache[spreadsheet_id].get("sheets", []))
+
+        _, sheets_service = self._get_services()
+
+        try:
+            spreadsheet = (
+                sheets_service.spreadsheets()
+                .get(
+                    spreadsheetId=spreadsheet_id,
+                    fields="sheets(properties(title,sheetId))",
+                )
+                .execute()
+            )
+
+            cache[spreadsheet_id] = spreadsheet
+            _metadata_cache.set(cache)
+
+            return cast(list[dict[str, Any]], spreadsheet.get("sheets", []))
+        except Exception as error:
+            log.error(f"Error getting spreadsheet metadata: {error}")
+            return []
+
+    def invalidate_metadata_cache(self, spreadsheet_id: str) -> None:
+        """Remove spreadsheet from metadata cache after mutations.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet to invalidate
+        """
+        cache = _metadata_cache.get({})
+        if spreadsheet_id in cache:
+            del cache[spreadsheet_id]
+            _metadata_cache.set(cache)
+
     def get_sheet_by_name(
         self, spreadsheet_id: str, sheet_name: str
     ) -> dict[str, Any] | None:
@@ -225,42 +274,24 @@ class GoogleSheetsService:
         Returns:
             Dictionary with information about the found sheet or None if not found
         """
-        _, sheets_service = self._get_services()
-
-        try:
-            spreadsheet_metadata = (
-                sheets_service.spreadsheets()
-                .get(spreadsheetId=spreadsheet_id)
-                .execute()
+        sheets = self.get_all_sheets(spreadsheet_id)
+        if not sheets:
+            log.warning(
+                f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}"
             )
-
-            sheets = spreadsheet_metadata.get("sheets", [])
-            if not sheets:
-                log.warning(
-                    f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}"
-                )
-                return None
-
-            target_sheet = None
-            available_sheets = []
-            for sheet in sheets:
-                sheet_title = sheet["properties"]["title"]
-                available_sheets.append(sheet_title)
-                if sheet_title == sheet_name:
-                    target_sheet = sheet
-                    break
-
-            if not target_sheet:
-                log.warning(
-                    f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}"
-                )
-                return None
-
-            return cast(dict[str, Any], target_sheet)
-
-        except Exception as error:
-            log.error(f"Error getting sheet by name: {error}")
             return None
+
+        for sheet in sheets:
+            if sheet.get("properties", {}).get("title") == sheet_name:
+                return cast(dict[str, Any], sheet)
+
+        available_sheets = [
+            s.get("properties", {}).get("title", "") for s in sheets
+        ]
+        log.warning(
+            f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}"
+        )
+        return None
 
     def create_drive_folder(
         self, folder_name: str, parent_folder_id: str | None = None

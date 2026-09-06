@@ -56,14 +56,27 @@ class SpecialistStorage:
         log.info("Created timesheet for %s", specialist.name)
         return result
 
+    def find_existing_timesheets(
+        self, folder_id: str, specialist_names: list[str], project_name: str
+    ) -> dict[str, str]:
+        all_files = self._sheets.list_drive_spreadsheets(folder_id)
+        file_map = {f["name"]: f["id"] for f in all_files}
+
+        result: dict[str, str] = {}
+        for name in specialist_names:
+            title = utils.generate_timesheet_title(name, project_name)
+            if title in file_map:
+                result[name] = file_map[title]
+        return result
+
     def update_timesheet_ids(
         self, spreadsheet_id: str, sheet_name: str, specialists: list[Specialist]
     ) -> bool:
-        data = self._prepare_updates(spreadsheet_id, sheet_name, specialists)
-        if not data:
+        updates, headers = self._prepare_updates(spreadsheet_id, sheet_name, specialists)
+        if not updates:
             return True
 
-        self._apply_updates(spreadsheet_id, sheet_name, data)
+        self._apply_updates(spreadsheet_id, sheet_name, updates, headers)
         return True
 
     def _read_sheet(
@@ -181,18 +194,18 @@ class SpecialistStorage:
 
     def _prepare_updates(
         self, spreadsheet_id: str, sheet_name: str, specialists: list[Specialist]
-    ) -> list[tuple[int, str]]:
+    ) -> tuple[list[tuple[int, str]], list[str]]:
         values, headers = self._sheets.get_sheet_data_with_headers(
             spreadsheet_id, sheet_name, RangeFormat.SPECIALIST_DATA.value
         )
         if not values:
-            return []
+            return [], []
 
         timesheet_col = self._sheets.find_column_index(
             headers, [ColumnName.TIMESHEET.value]
         )
         if timesheet_col is None:
-            return []
+            return [], []
 
         updates: list[tuple[int, str]] = []
         for sp in specialists:
@@ -200,10 +213,10 @@ class SpecialistStorage:
                 continue
             if sp.row_index is not None:
                 updates.append((sp.row_index, sp.timesheet))
-        return updates
+        return updates, headers
 
     def _apply_updates(
-        self, spreadsheet_id: str, sheet_name: str, updates: list[tuple[int, str]]
+        self, spreadsheet_id: str, sheet_name: str, updates: list[tuple[int, str]], headers: list[str]
     ) -> None:
         sheet = self._sheets.get_sheet_by_name(spreadsheet_id, sheet_name)
         if not sheet:
@@ -211,9 +224,6 @@ class SpecialistStorage:
 
         sheet_id = sheet.get("properties", {}).get("sheetId")
 
-        _, headers = self._sheets.get_sheet_data_with_headers(
-            spreadsheet_id, sheet_name, RangeFormat.SPECIALIST_DATA.value
-        )
         timesheet_col = self._sheets.find_column_index(
             headers, [ColumnName.TIMESHEET.value]
         )
