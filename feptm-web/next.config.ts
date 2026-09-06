@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.resolve(process.cwd()),
   skipTrailingSlashRedirect: true,
+  experimental: {
+    proxyTimeout: 300_000,
+  },
 
   async rewrites() {
     return [

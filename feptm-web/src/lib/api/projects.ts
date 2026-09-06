@@ -30,6 +30,8 @@ export const PROJECT_CLOSE_PERIOD_ERROR = 'Failed to close the period. Try again
 
 export const PROJECT_PERIOD_ALREADY_CLOSED = 'This period is already closed.';
 
+const API_REQUEST_TIMEOUT_MS = 600_000;
+
 const JSON_HEADERS: HeadersInit = {
   Accept: 'application/json',
 };
@@ -53,7 +55,7 @@ async function requestJson(
   fallbackMessage: string,
 ): Promise<Response> {
   try {
-    return await fetch(url, init);
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS) });
   } catch {
     throw new ApiClientError(fallbackMessage, 'network', null);
   }

@@ -1,23 +1,21 @@
-created: '2026-09-05'
-description: 'Create a project card: it opens in the same dashboard tab on a project-name
-  click in the list or after a successful project create. The card header has the
-  ForEach Partners logo and company name, then Project project name. The card has
-  Update team, Update rates, and Close period buttons, and a block of links to the
-  project spreadsheets and specialist timesheets.'
+created: '2026-09-06'
+description: Cut off rewritten /api/* proxy waits at 5 minutes (experimental.proxyTimeout
+  300000 ms), not at Next's default 30 seconds. After 10 minutes with no backend
+  response, keep the existing FR error copy. Do not wait forever.
 fr_ids:
-- FR-PROJECT-001
 - FR-CREATE-001
+- FR-PAYMENT-001
+- FR-PROJECT-001
 - FR-SHEET-001
 - FR-SYNC-001
 - FR-SYNC-RATES-001
-- FR-PAYMENT-001
 repos:
 - web
 ceremony: large
 status: done
 baseline_policy: fix_err
 sessions:
-  init: "1ef09653-c636-4da0-b234-efa7b61d603e"
-  plan: "85e20f61-4131-4a77-aa09-9c9c50403362"
-  implement: "e9a39402-d763-4686-bd39-dab6e79213eb"
-  finalize: "80cd7b62-4665-48d4-82fd-c2b03697820c"
+  init: "45f56362-7299-4157-9a82-19e268560e2e"
+  plan: "9a4def9d-057f-42db-a5b8-14eaf228d416"
+  implement: "9a4def9d-057f-42db-a5b8-14eaf228d416"
+  finalize: "7d70d36f-00d6-4e61-869c-faff14dc7e8a"
