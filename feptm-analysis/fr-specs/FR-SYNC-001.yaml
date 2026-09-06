@@ -20,7 +20,7 @@ description: |
   project spreadsheets are on the card; timesheet links appear, stay unchanged,
   or are extended according to the Update team result; an empty Team does not
   create timesheet links and does not remove links already shown. The card does
-  not close. While Update team is in progress the user MUST NOT leave the card.
+  not close.
 
 priority: must
 
@@ -36,12 +36,11 @@ acceptance_criteria:
   - "The sync pipeline does not skip the ID write-back step when the number of newly created timesheets differs from the pre-existing count."
   - "Running sync with no specialist changes produces zero net modifications to the Team sheet, report spreadsheets, or calculation spreadsheets."
   - "The project card shows an Update team button."
-  - "A Back to project list button is at the top left. A click returns to the dashboard list in the same tab, not a new window."
   - "The project card opens in a new browser tab. The dashboard list stays in the previous tab."
-  - "While Update team is in progress the status is \"Updating team...\". Update team, Update rates, Close period, and Back to project list are disabled. The user MUST NOT leave to the list until Update team finishes. A repeated Update team click does not send a second request."
-  - "On a successful sync response the card shows \"Timesheets created: N.\" where N is specialists_created from the sync response, including 0. The card does not close. Command buttons and Back to project list are enabled again. Per-row Team errors are not shown on the card."
+  - "While Update team is in progress the status is \"Updating team...\". Update team, Update rates, and Close period are disabled. A repeated Update team click does not send a second request."
+  - "On a successful sync response the card shows \"Timesheets created: N.\" where N is specialists_created from the sync response, including 0. The card does not close. Command buttons are enabled again. Per-row Team errors are not shown on the card."
   - "After a successful Update team the Tables block on the card follows FR-SHEET-001: Project info / Team, General Expenses, and Payment Distribution links are present; Specialist timesheets links exist only when timesheets exist. Success MUST NOT hide links that were already shown. An empty Team does not add timesheet links."
-  - "A failed sync request and a network timeout show the same text on the card: \"Failed to update the team. Try again later.\" The card does not close. This failure does not add new table links, including timesheet links. An already visible Tables block stays as it was. Command buttons and Back to project list are enabled again."
+  - "A failed sync request and a network timeout show the same text on the card: \"Failed to update the team. Try again later.\" The card does not close. This failure does not add new table links, including timesheet links. An already visible Tables block stays as it was. Command buttons are enabled again."
   - "Visual style of the card and the primary button MUST match docs/ui-style.md and the snapshots in docs/ui-style/: cards as cards.png, header as header.png. The heading word \"Project\" uses the same color as the Update team primary button. The project name in that heading keeps the heading color from heading.png. MUST NOT copy marketing landing copy or the chat widget."
 
 implements:
@@ -60,3 +59,4 @@ revision_history:
   - "v5 (2026-09-01): Tables block per FR-SHEET-001 — three project sheets always; timesheet links only when timesheets exist; empty Team adds no timesheet links and does not remove shown links; failed sync adds no new table or timesheet links."
   - "v6 (2026-09-05): the card opens in a new browser tab on a project-name click or after a successful create; the dashboard list stays in the previous tab."
   - "v7 (2026-09-05): heading word Project uses the Update team primary color; the project name keeps the heading.png color."
+  - "v8 (2026-09-06): remove Back to project list from the project card."

@@ -1,0 +1,9 @@
+created: '2026-09-06'
+repos:
+  web:
+    findings:
+    - ar_spec: AR-WORKSPACE-001
+      check: gitignore-essentials
+      message: 'WARN: .gitignore missing .DS_Store'
+      severity: warn
+    orphans: []

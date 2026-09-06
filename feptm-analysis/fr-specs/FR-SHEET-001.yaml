@@ -16,7 +16,7 @@ description: |
   has a timesheet; the label is the timesheet file name in the Google Drive
   folder. While there are no timesheets, those links are absent.
 
-  Exit on link click: a new Sheets tab. Back to project list is FR-SYNC-001.
+  Exit on link click: a new Sheets tab.
 
 priority: must
 
@@ -35,6 +35,8 @@ acceptance_criteria:
   - "A click on any shown link opens the matching Google spreadsheet in a new tab. The dashboard card stays in the previous tab."
   - "No link without a URL. Every shown link opens an existing spreadsheet of this project."
   - "Visual style MUST match docs/ui-style.md: secondary controls as the outline on buttons.png or chips on cards.png. MUST NOT copy marketing landing copy or the chat widget."
+  - "The project card MUST NOT show the text Back to project list and MUST NOT navigate to the dashboard list. The card header logo and ForEach Partners wordmark are the same link to https://foreachpartners.com/ as on the dashboard. A click opens that URL in a new browser tab."
 
 revision_history:
   - "v1 (2026-09-05): the card opens in a new browser tab on a project-name click or after a successful create; the dashboard list stays in the previous tab."
+  - "v2 (2026-09-06): remove Back to project list from the project card."

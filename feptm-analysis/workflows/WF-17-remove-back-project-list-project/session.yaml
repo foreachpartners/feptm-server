@@ -1,0 +1,17 @@
+created: '2026-09-06'
+description: Remove Back to project list from the project card. Make the ForEach Partners
+  logo and title in the header a link to https://foreachpartners.com/ on the dashboard
+  and the card.
+fr_ids:
+- FR-PROJECT-001
+- FR-SHEET-001
+repos:
+- web
+ceremony: medium
+status: implementing
+baseline_policy: fix_err
+sessions:
+  init: "4241582f-3ae8-4b8c-b2ed-1b8c3ddc0918"
+  plan: "37d3a7bb-093d-466b-be27-e0a5d6746733"
+  implement: "37d3a7bb-093d-466b-be27-e0a5d6746733"
+  finalize: "46dffb32-3412-4a80-aa7d-472a1ac8f959"

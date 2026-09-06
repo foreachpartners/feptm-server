@@ -87,6 +87,7 @@ html[data-theme="light"] {
   align-items: center;
   gap: 0.75rem;
   color: var(--foreground);
+  text-decoration: none;
 }
 
 .app-header__logo {
@@ -274,24 +275,6 @@ html[data-theme="light"] {
   padding: var(--space-xl) 0;
   display: grid;
   gap: var(--space-lg);
-}
-
-.project-card__back {
-  justify-self: start;
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.project-card__back:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .project-card__heading {

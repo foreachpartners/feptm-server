@@ -30,7 +30,9 @@ acceptance_criteria:
   - "A click on \"Create project\" opens the create form as an overlay on the list."
   - "After a successful project create the created project's card opens in a new browser tab, not a new window. The dashboard list stays in the previous tab."
   - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark background, ForEach Partners header logo, primary button as on buttons.png / header.png, heading as heading.png. List-row chrome (fill, border, radius) MAY use cards.png tokens. List layout MUST follow the Tables list on the project card, not the multi-column grid on cards.png. MUST NOT copy marketing landing copy or the chat widget."
+  - "The header logo and the wordmark ForEach Partners are one link to https://foreachpartners.com/ on the dashboard and on the project card. A click opens that URL in a new browser tab. Colors, styles, size, and placement of the logo and the words ForEach Partners MUST NOT change."
 
 revision_history:
   - "v1 (2026-09-05): project-name click and successful create open the card in a new browser tab; the dashboard list stays in the previous tab."
   - "v2 (2026-09-05): dashboard project names are a single-column vertical list of full-width rows matching the Tables links on the project card, not a multi-column card grid."
+  - "v3 (2026-09-06): header logo and ForEach Partners wordmark are one link to https://foreachpartners.com/ on the dashboard and the card; a click opens a new browser tab; colors, styles, size, and placement MUST NOT change."

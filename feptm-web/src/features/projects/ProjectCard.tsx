@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, type ReactElement } from 'react';
 
@@ -119,15 +118,6 @@ export function ProjectCard(): ReactElement {
     <>
       <AppHeader inert={isCloseOpen || undefined} />
       <main className="project-card" inert={isCloseOpen || undefined}>
-        {isCommandBusy ? (
-          <button className="project-card__back" disabled type="button">
-            Back to project list
-          </button>
-        ) : (
-          <Link className="project-card__back" href="/">
-            Back to project list
-          </Link>
-        )}
         <h1 className="project-card__heading">
           <span className="project-card__heading-label">Project</span>
           {displayName.length > 0 ? (

@@ -9,7 +9,12 @@ interface AppHeaderProps {
 export function AppHeader({ inert }: AppHeaderProps): ReactElement {
   return (
     <header className="app-header" inert={inert || undefined}>
-      <div className="app-header__brand">
+      <a
+        className="app-header__brand"
+        href="https://foreachpartners.com/"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
         <img
           src="/foreach-partners-logo.png"
           alt=""
@@ -18,7 +23,7 @@ export function AppHeader({ inert }: AppHeaderProps): ReactElement {
           className="app-header__logo"
         />
         <span className="app-header__wordmark">ForEach Partners</span>
-      </div>
+      </a>
       <ThemeToggle />
     </header>
   );
