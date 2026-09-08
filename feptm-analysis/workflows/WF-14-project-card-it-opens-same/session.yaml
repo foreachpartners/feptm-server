@@ -1,7 +1,6 @@
-created: '2026-09-06'
-description: Cut off rewritten /api/* proxy waits at 5 minutes (experimental.proxyTimeout
-  300000 ms), not at Next's default 30 seconds. After 10 minutes with no backend
-  response, keep the existing FR error copy. Do not wait forever.
+created: '2026-09-08'
+description: Rename the create overlay and Close period modal secondary button from
+  Cancel to Close. Close period on the project card stays unchanged.
 fr_ids:
 - FR-CREATE-001
 - FR-PAYMENT-001
@@ -15,7 +14,7 @@ ceremony: large
 status: done
 baseline_policy: fix_err
 sessions:
-  init: "45f56362-7299-4157-9a82-19e268560e2e"
-  plan: "9a4def9d-057f-42db-a5b8-14eaf228d416"
-  implement: "9a4def9d-057f-42db-a5b8-14eaf228d416"
-  finalize: "7d70d36f-00d6-4e61-869c-faff14dc7e8a"
+  init: "7e6de07c-fb1b-4333-b707-ce5863f42830"
+  plan: "6c697d91-9006-41b6-ba83-ffc47ce6f73f"
+  implement: "ebac78d0-87e7-4155-886d-8b4111f37631"
+  finalize: "9efe2b57-e00f-4ae6-a74a-cd71682a4082"

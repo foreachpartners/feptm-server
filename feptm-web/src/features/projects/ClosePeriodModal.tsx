@@ -128,7 +128,7 @@ export function ClosePeriodModal({
               onClick={handleCancel}
               type="button"
             >
-              Cancel
+              Close
             </button>
           </div>
         </form>

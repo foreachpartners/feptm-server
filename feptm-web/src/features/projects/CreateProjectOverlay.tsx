@@ -111,7 +111,7 @@ export function CreateProjectOverlay(): ReactElement | null {
               onClick={handleCancel}
               type="button"
             >
-              Cancel
+              Close
             </button>
           </div>
         </form>
