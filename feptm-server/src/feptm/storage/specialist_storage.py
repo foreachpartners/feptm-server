@@ -150,12 +150,12 @@ class SpecialistStorage:
 
     def _parse_row(self, row: list, hmap: dict[str, int | None], row_number: int | None = None) -> Specialist | None:
         name = (
-            row[hmap["name"]].strip()
+            str(row[hmap["name"]]).strip()
             if hmap["name"] is not None and hmap["name"] < len(row)
             else ""
         )
         role = (
-            row[hmap["role"]].strip()
+            str(row[hmap["role"]]).strip()
             if hmap["role"] is not None and hmap["role"] < len(row)
             else ""
         )
