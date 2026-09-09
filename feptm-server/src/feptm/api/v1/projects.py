@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from feptm.core.config import settings
 from feptm.core.exceptions import (
+    ProjectDuplicateNameError,
     ProjectFolderNotFoundError,
     ProjectSpreadsheetNotFoundError,
 )
@@ -86,6 +87,18 @@ async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
             )
 
         service: TimesheetProjectService = get_timesheet_project_service()
+
+        if settings.GOOGLE_PROJECTS_FOLDER_ID:
+            existing_folders = await asyncio.to_thread(
+                service.list_projects, settings.GOOGLE_PROJECTS_FOLDER_ID
+            )
+            requested_name_lower = request.project_name.strip().lower()
+            for folder in existing_folders:
+                if folder.get("name", "").strip().lower() == requested_name_lower:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Project with name '{request.project_name}' already exists.",
+                    )
 
         result = await asyncio.to_thread(
             service.create_project,

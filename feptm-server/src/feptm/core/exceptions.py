@@ -19,3 +19,9 @@ class ProjectSpreadsheetNotFoundError(Exception):
     def __init__(self, expected_name: str) -> None:
         self.expected_name = expected_name
         super().__init__(f"Project spreadsheet not found: {expected_name}")
+
+
+class ProjectDuplicateNameError(Exception):
+    def __init__(self, project_name: str) -> None:
+        self.project_name = project_name
+        super().__init__(f"Project with name '{project_name}' already exists")
