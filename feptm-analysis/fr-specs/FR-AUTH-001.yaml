@@ -1,0 +1,59 @@
+id: FR-AUTH-001
+title: Sign in with Google via the Login button in the header
+description: |
+  Today the product opens the dashboard and the project card without sign-in
+  (FR-PROJECT-001). Google Drive and Sheets operations run as a shared server
+  account. This FR adds a Login button in the header of the dashboard and the
+  project card for Google sign-in.
+
+  Entry: the projects dashboard (FR-PROJECT-001) or the project card
+  (project-name click, FR-PROJECT-001). The theme button is already in the
+  header (FR-THEME-001). The Login button sits to the right of the theme
+  button.
+
+  Before sign-in, operation buttons (Create project, Update team, Update
+  rates, Close period) are visible and disabled. The project list and the
+  project tables are not shown.
+
+  A click on Login opens Google's sign-in window: account picker and consent
+  for Google Drive and Google Sheets. After the user grants access, the
+  window closes by itself. The existing dashboard or project-card UI is
+  shown. Login becomes Logout. Visual style, component structure, and
+  interaction of the existing UI stay as they are. This FR adds only the
+  Login/Logout control, sign-in behaviour, and show/hide of content.
+  Existing components MUST NOT be redesigned.
+
+  Logout ends the session, hides content, disables operation buttons, and
+  returns the UI to the unsigned-in state.
+
+priority: must
+
+depends_on:
+  - FR-PROJECT-001
+  - FR-SHEET-001
+  - FR-THEME-001
+
+acceptance_criteria:
+  - "On the dashboard header and on the project-card header a Login button is present to the right of the theme button."
+  - "Before sign-in, the operation buttons (Create project, Update team, Update rates, Close period) are visible, disabled, and MUST NOT react to clicks."
+  - "Before sign-in, the project tables and the project list MUST NOT be shown."
+  - "A click on Login opens Google's sign-in window with the heading \"Sign in with Google\"."
+  - "Google's sign-in window shows the Google accounts available in the browser (when the user is signed into the browser) and the option \"Use another account\"."
+  - "After the user picks a Google account, the consent screen asks for: \"See, edit, create, and delete all of your Google Drive files\" and \"See, edit, create, and delete all your Google Sheets spreadsheets\"."
+  - "After the user grants consent, Google's sign-in window closes by itself with no extra click in the product."
+  - "After a successful sign-in the header button text changes from Login to Logout."
+  - "After a successful sign-in the existing dashboard or project-card UI is shown. Visual style, component structure, and interaction stay as implemented before this FR."
+  - "After a successful sign-in the operation buttons (Create project, Update team, Update rates, Close period) are enabled and react to clicks."
+  - "After a successful sign-in the project tables and the project list are shown."
+  - "A click on Logout ends the session. The header button text returns to Login. Operation buttons become disabled. Tables and lists are hidden."
+  - "If the user cancels Google sign-in (Cancel on the consent screen or closing the window), the window closes. The header button stays Login. Content MUST NOT be shown."
+  - "Sign-in state (Login vs Logout) is the same across all open browser tabs of the product in real time, without a page reload."
+  - "If after Google consent a network error occurs while completing sign-in, a modal appears over the page. Title: \"Sign-in error\". Body: \"Could not sign in. Check your internet connection and try again.\" Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "If after Google consent the server returns HTTP 500, a modal appears over the page. Title: \"Sign-in error\". Body: \"A server error occurred. Try again later or contact an administrator.\" Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "If after Google consent the server returns HTTP 401 (invalid code or token), a modal appears over the page. Title: \"Sign-in error\". Body: \"Could not complete sign-in. Try signing in again.\" Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "If after Google consent the server returns HTTP 403 (the account has no access to the product), a modal appears over the page. Title: \"Access denied\". Body: \"[email] is not registered in the FEP system\". Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "If after Google consent the server does not respond within 30 seconds, a modal appears over the page. Title: \"Sign-in error\". Body: \"The server is not responding. Check your internet connection and try again.\" Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "If after Google consent the server response fails validation (wrong shape or missing required fields), a modal appears over the page. Title: \"Sign-in error\". Body: \"Could not finish sign-in. Try again later.\" Close control: an X in the top-right corner. A click on X closes the modal. The header button stays enabled and reads Login."
+  - "On every error modal the close control (X) in the top-right corner MUST match docs/ui-style.md. On hover it changes colour / highlights. A click closes the modal and returns the unsigned-in state: header button Login, content hidden."
+  - "Visual style of product error modals MUST match docs/ui-style.md and the snapshots in docs/ui-style/: dark theme on first display (FR-THEME-001), primary control as on buttons.png / header.png. MUST NOT copy marketing landing copy or the chat widget."
+  - "The existing director dashboard UI and project-card UI (as implemented before this FR) MUST stay unchanged in visual style, component structure, and interaction. This FR adds only the Login/Logout header control, sign-in behaviour, and show/hide of content. Existing components MUST NOT be redesigned."

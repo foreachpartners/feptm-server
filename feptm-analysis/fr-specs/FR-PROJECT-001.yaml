@@ -1,8 +1,9 @@
 id: FR-PROJECT-001
 title: Show the project list on the shared dashboard URL
 description: |
-  The user opens one shared dashboard URL. There is no sign-in and no roles.
-  The first page is the project list.
+  The user opens one shared dashboard URL. Sign-in gating is FR-AUTH-001.
+  This FR applies after a successful sign-in: the first page is the project
+  list.
 
   Entry: the dashboard URL in the browser. Exit on project-name click: that
   project's card in a new browser tab. The dashboard list stays in the
@@ -10,14 +11,15 @@ description: |
   an overlay on the list. After a successful create the new project's card
   opens in a new browser tab. The dashboard list stays in the previous tab.
 
-  The dashboard shows project names from a single list request to the server
-  as a vertical list of full-width rows. That list uses the same layout as
-  the Tables links on the project card. An empty list response is not a
-  request failure.
+  After a successful sign-in the dashboard shows project names from a single
+  list request to the server as a vertical list of full-width rows. That
+  list uses the same layout as the Tables links on the project card. An
+  empty list response is not a request failure.
 
 priority: must
 
 acceptance_criteria:
+  - "Every acceptance criterion below applies after a successful sign-in (FR-AUTH-001). Unsigned-in gating is FR-AUTH-001."
   - "Opening the dashboard URL shows the dashboard immediately: no sign-in form, no login field, no password field."
   - "Opening the dashboard URL shows the dashboard heading \"FEP Projects Dashboard\", the \"Create project\" button, and the project-name list."
   - "The dashboard displays the project names returned by a single server list request."
@@ -36,3 +38,4 @@ revision_history:
   - "v1 (2026-09-05): project-name click and successful create open the card in a new browser tab; the dashboard list stays in the previous tab."
   - "v2 (2026-09-05): dashboard project names are a single-column vertical list of full-width rows matching the Tables links on the project card, not a multi-column card grid."
   - "v3 (2026-09-06): header logo and ForEach Partners wordmark are one link to https://foreachpartners.com/ on the dashboard and the card; a click opens a new browser tab; colors, styles, size, and placement MUST NOT change."
+  - "v4 (2026-09-22): Create project is enabled and the project list is shown only after a successful sign-in (FR-AUTH-001)."
