@@ -1,0 +1,43 @@
+id: FR-AUTH-002
+title: Run Google API operations as the signed-in user
+description: |
+  All Google Drive and Google Sheets operations (Update team, Update rates,
+  Close period, Create project, read the project list) run as the Google
+  account that signed in through FR-AUTH-001. The product MUST NOT use a
+  shared server Google account for user operations. Each employee works
+  with their own Google files under their own account.
+
+  If the signed-in account has no access to the project files on Google
+  Drive, the operation fails. The product MUST NOT retry the operation as
+  another account. The Google access token refreshes in the background
+  with no user action. If the token cannot be refreshed (the user revoked
+  access), the session ends by itself.
+
+  Entry: the user is signed in with Google (FR-AUTH-001) and is on the
+  dashboard or the project card. Exit: the operation succeeds or fails;
+  changes in Google files are recorded as the signed-in account.
+
+priority: must
+
+depends_on:
+  - FR-AUTH-001
+  - FR-SYNC-001
+  - FR-SYNC-RATES-001
+  - FR-PAYMENT-001
+  - FR-CREATE-001
+
+acceptance_criteria:
+  - "All Google API operations (Update team, Update rates, Close period, Create project) use the signed-in user's Google account. After Logout and sign-in as a different account, operations run as the new account."
+  - "Create project uses the signed-in user's Google account to create the folder and spreadsheets on Google Drive."
+  - "With no active session (the user is not signed in or has signed out) the product MUST NOT send requests to the Google Drive or Google Sheets API. Disabled buttons on the front end are not enough: the server MUST reject requests that have no valid session."
+  - "If the signed-in Google account has no access to the project folder or spreadsheets on Google Drive (HTTP 403 from the Google API), the operation fails. The product MUST NOT retry the operation as another account or as a service account."
+  - "On HTTP 403 during an operation (not during sign-in) a modal appears over the page. Body: \"No access to the project files on Google Drive\". Close control: an X in the top-right corner. After the modal closes the user stays on the current page and the screen returns to the state before the operation."
+  - "While the session is active the Google access token refreshes in the background. The user MUST NOT see the sign-in window during automatic token refresh."
+  - "If the Google access token cannot be refreshed (the user revoked access in Google settings, or Google rejected the refresh), the session ends by itself. The header button changes to Login, content is hidden, and operation buttons become disabled."
+  - "If during an operation the server receives HTTP 401 from the Google API (the token expired and cannot be refreshed), a modal appears over the page. Body: \"Session expired. Sign in again to continue.\" Close control: an X in the top-right corner. After the modal closes the header button changes to Login, content is hidden, and operation buttons become disabled."
+  - "On Google Drive/Sheets read operations (project list for the dashboard or spreadsheet data for the project card), if the signed-in account has no read access, the content is replaced by the text \"No access to the data\". Operation buttons (Create project, Update team, Update rates, Close period) stay disabled."
+  - "If the Google API returns any other error not named in this FR (including 404 File Not Found, 503 Service Unavailable, Drive quota / storage limits, or application quota), the operation fails. A modal appears over the page. Title: \"Operation error\". Body: \"Could not complete the operation because of a Google Drive/Sheets error. Try again later or contact an administrator.\" Close control: an X in the top-right corner. After the modal closes the user stays on the current page and the operation button is enabled again."
+  - "Existing success and validation-error texts for Update team, Update rates, and Close period (FR-SYNC-001, FR-SYNC-RATES-001, FR-PAYMENT-001) still apply on successful operations and on data-validation errors. Authorization errors during sign-in (HTTP 401, 403) are FR-AUTH-001. Authorization errors during an operation (HTTP 401, 403) are this FR."
+
+revision_history:
+  - "v1 (2026-09-22): Google Drive and Sheets operations run as the signed-in user; no shared server account; 401/403 and other Google errors."
