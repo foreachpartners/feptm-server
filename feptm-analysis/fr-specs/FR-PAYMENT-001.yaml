@@ -24,9 +24,9 @@ description: |
   The dashboard list stays in the previous tab.
   Close period opens a modal over the project card.
 
-  Cancel before success: the modal closes, the period is not closed, the
-  project card is unchanged for the period. Cancel after success: the modal
-  closes, the period stays closed, the project card is visible. Cancel does
+  Close before success: the modal closes, the period is not closed, the
+  project card is unchanged for the period. Close after success: the modal
+  closes, the period stays closed, the project card is visible. Close does
   not undo closure. On error: the user stays in the modal on the project
   card, error text is on the form, the period is not closed.
 
@@ -53,14 +53,14 @@ acceptance_criteria:
   - "The project card opens in a new browser tab. The dashboard list stays in the previous tab."
   - "Close period opens a modal over the project card, not a new page and not a new tab."
   - "While the modal is open, a click on the dimmed project card does not close the period, does not open spreadsheets, and does not navigate to the list. The project card under the modal is not clickable."
-  - "The modal has a Period name field; the text \"Important! All unclosed hours, rates, and dates will be fixed. After that they can be changed only by hand.\"; Confirm (primary) and Cancel (secondary) buttons."
+  - "The modal has a Period name field; the text \"Important! All unclosed hours, rates, and dates will be fixed. After that they can be changed only by hand.\"; Confirm (primary) and Close (secondary) buttons."
   - "While Period name is empty or whitespace-only, Confirm is disabled and no close request is sent."
-  - "Cancel before successful closure closes the modal. The period is not closed. The project card is unchanged for the period."
-  - "While closure is in progress the status is \"Closing period...\". The modal cannot be closed. Confirm, Cancel, Update team, Update rates, and Close period are disabled. A repeated Confirm click does not send a second request."
-  - "On a successful close response the modal stays open and shows \"Period closed: {period_name}.\" where period_name is from the response. Confirm is disabled and no second close request is sent. Cancel is enabled: it closes the modal, the project card is visible, the period stays closed. Cancel does not undo closure. The project card under the modal is not clickable."
-  - "A failed request and a network timeout keep the modal open; the form shows \"Failed to close the period. Try again later.\" The period is not closed. Confirm and Cancel are enabled again. The project card under the modal is not clickable."
-  - "A 409 response (a period with that name is already closed) keeps the modal open; the form shows \"This period is already closed.\" The period is not closed again. Confirm and Cancel are enabled again. The project card under the modal is not clickable."
-  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Close period in the command row is a primary button, same style and colors as Update team. Confirm is the primary button as on buttons.png / header.png. Cancel is the secondary outline button as on buttons.png / footer.png. Closure risk is the warning text in the modal, not a third palette from the landing page. MUST NOT copy marketing landing copy or the chat widget."
+  - "Close before successful closure closes the modal. The period is not closed. The project card is unchanged for the period."
+  - "While closure is in progress the status is \"Closing period...\". The modal cannot be closed. Confirm and Close in the modal, and Update team, Update rates, and Close period on the project card, are disabled. A repeated Confirm click does not send a second request."
+  - "On a successful close response the modal stays open and shows \"Period closed: {period_name}.\" where period_name is from the response. Confirm is disabled and no second close request is sent. Close is enabled: it closes the modal, the project card is visible, the period stays closed. Close does not undo closure. The project card under the modal is not clickable."
+  - "A failed request and a network timeout keep the modal open; the form shows \"Failed to close the period. Try again later.\" The period is not closed. Confirm and Close are enabled again. The project card under the modal is not clickable."
+  - "A 409 response (a period with that name is already closed) keeps the modal open; the form shows \"This period is already closed.\" The period is not closed again. Confirm and Close are enabled again. The project card under the modal is not clickable."
+  - "Visual style MUST match docs/ui-style.md and the snapshots in docs/ui-style/. Close period in the command row is a primary button, same style and colors as Update team. Confirm is the primary button as on buttons.png / header.png. Close is the secondary outline button as on buttons.png / footer.png. Closure risk is the warning text in the modal, not a third palette from the landing page. MUST NOT copy marketing landing copy or the chat widget."
 
 implements:
   - src/feptm/api/v1/periods.py::close_payment_period
@@ -77,3 +77,4 @@ revision_history:
   - "v5 (2026-09-05): the card opens in a new browser tab on a project-name click or after a successful create; the dashboard list stays in the previous tab."
   - "v6 (2026-09-05): Close period in the command row is a primary button, same style and colors as Update team. Modal Confirm stays primary and Cancel stays secondary."
   - "v7 (2026-09-06): remove Back to project list from the project card."
+  - "v8 (2026-09-08): modal secondary button label is Close, not Cancel. Close is the modal button; Close period is the command on the project card."
